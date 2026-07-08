@@ -119,30 +119,30 @@ export const PublicLayout: React.FC = () => {
       {/* Main Header */}
       <header className="bg-white border-b border-zinc-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-8">
+          <div className="flex-1 flex items-center">
             <Link to="/" className="flex items-center gap-2">
               <div className="w-8 h-8 rounded bg-brand-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
                 O
               </div>
               <span className="font-bold text-xl tracking-tight text-neutral-800">Orynt</span>
             </Link>
-
-            <nav className="hidden md:flex items-center gap-6">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={`text-sm font-medium transition-colors ${
-                    pathname === link.path ? 'text-brand-600' : 'text-zinc-500 hover:text-neutral-800'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
           </div>
 
-          <div className="flex items-center gap-4">
+          <nav className="hidden md:flex items-center gap-6">
+            {navLinks.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={`text-sm font-medium transition-colors ${
+                  pathname === link.path ? 'text-brand-600' : 'text-zinc-500 hover:text-neutral-800'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="flex-1 flex items-center justify-end gap-4">
             {isAuthenticated && user ? (
               <div className="flex items-center gap-3">
                 <span className="text-xs font-semibold px-2.5 py-1 bg-zinc-100 rounded-full text-zinc-700 uppercase">
