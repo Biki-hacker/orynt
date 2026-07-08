@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-neutral-50 text-neutral-800 antialiased selection:bg-brand-100;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
+}
+
+/* Live Score Indicator Blink */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.95); }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Glassmorphism/Card Highlight (subtle enterprise borders) */
+.enterprise-card {
+  @apply bg-white border border-zinc-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200;
+}
+
+.enterprise-input {
+  @apply w-full bg-white border border-zinc-300 rounded px-3 py-1.5 text-sm text-neutral-800 focus:outline-none focus:border-brand-500 transition-colors duration-150;
+}
+
+.enterprise-btn-primary {
+  @apply bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm rounded px-4 py-2 transition-all duration-150 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2;
+}
+
+.enterprise-btn-secondary {
+  @apply bg-white hover:bg-neutral-100 text-neutral-800 border border-zinc-300 font-medium text-sm rounded px-4 py-2 transition-all duration-150 focus:outline-none;
+}

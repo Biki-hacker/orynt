@@ -1,0 +1,35 @@
+# ─── Environment Variables (secrets) ───
+.env
+!.env.example
+*firebase-adminsdk*.json
+*credentials*.json
+*service-account*.json
+*creds*.json
+
+
+# ─── Go Backend ───
+backend/orynt.exe
+backend/orynt
+backend/tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+
+# ─── Node / Frontend ───
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ─── OS & Editor ───
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.log
