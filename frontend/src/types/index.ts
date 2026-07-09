@@ -216,3 +216,9 @@ export interface ExitRoute {
   reason: string;
 }
 
+export interface AIChatHistoryItem {
+  sender: 'user' | 'ai';
+  text: string;
+}
+
+

@@ -201,10 +201,17 @@ type Notification struct {
 	CreatedAt time.Time `json:"createdAt" firestore:"createdAt"`
 }
 
+// AIChatHistoryItem represents a message in conversation history
+type AIChatHistoryItem struct {
+	Sender string `json:"sender"` // "user" or "ai"
+	Text   string `json:"text"`
+}
+
 // AIChatRequest represents prompt sent to Gemini API
 type AIChatRequest struct {
-	Message string `json:"message" binding:"required"`
-	Role    string `json:"role"` // user's role (public, staff, admin) for context grounding
+	Message string              `json:"message" binding:"required"`
+	Role    string              `json:"role"` // user's role (public, staff, admin) for context grounding
+	History []AIChatHistoryItem `json:"history"`
 }
 
 // AIChatResponse returned by Gemini agent

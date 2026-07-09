@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { api } from '../../services/api'
-import { AIChatResponse } from '../../types'
 import { MessageSquare, X, Send, Sparkles } from 'lucide-react'
+import { useAuthStore } from '../../store'
 
 interface ChatMessage {
   id: string;
@@ -73,20 +72,106 @@ export const AIChatbot: React.FC = () => {
       timestamp: new Date()
     }
 
+    // Build history of the last 10 messages before adding the new message
+    const history = messages
+      .filter((m) => m.id !== 'welcome')
+      .slice(-10)
+      .map((m) => ({
+        sender: m.sender,
+        text: m.text
+      }))
+
     setMessages((prev) => [...prev, userMsg])
     setInputText('')
     setIsTyping(true)
 
+    const token = useAuthStore.getState().accessToken
+    const headers = new Headers()
+    headers.set('Content-Type', 'application/json')
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
+
     try {
-      const data = await api.post<AIChatResponse>('/ai/chat', { message: text })
-      const aiMsg: ChatMessage = {
-        id: Math.random().toString(36).substring(7),
-        sender: 'ai',
-        text: data.response,
-        timestamp: new Date(),
-        sources: data.sources
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          message: text,
+          history
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to start chat stream')
       }
-      setMessages((prev) => [...prev, aiMsg])
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No stream reader available')
+      }
+
+      const decoder = new TextDecoder()
+      let done = false
+      let aiResponseText = ''
+      let aiSources: string[] = []
+
+      // Create a placeholder message in chat
+      const aiMsgId = Math.random().toString(36).substring(7)
+      const initialAiMsg: ChatMessage = {
+        id: aiMsgId,
+        sender: 'ai',
+        text: '',
+        timestamp: new Date(),
+        sources: []
+      }
+
+      setMessages((prev) => [...prev, initialAiMsg])
+      setIsTyping(false) // turn off typing animation once stream starts rendering
+
+      let buffer = ''
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read()
+        done = readerDone
+        if (value) {
+          const chunkStr = decoder.decode(value, { stream: true })
+          buffer += chunkStr
+
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || '' // keep partial line in buffer
+
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (trimmed.startsWith('data:')) {
+              const dataStr = trimmed.slice(5).trim()
+              try {
+                const parsed = JSON.parse(dataStr)
+                if (parsed.response) {
+                  aiResponseText += parsed.response
+                }
+                if (parsed.sources && parsed.sources.length > 0) {
+                  aiSources = [...new Set([...aiSources, ...parsed.sources])]
+                }
+                // Update placeholder in real-time
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === aiMsgId
+                      ? {
+                          ...msg,
+                          text: aiResponseText,
+                          sources: aiSources.length > 0 ? aiSources : undefined
+                        }
+                      : msg
+                  )
+                )
+              } catch (e) {
+                // Ignore JSON parsing errors for incomplete chunks
+              }
+            }
+          }
+        }
+      }
     } catch (err: any) {
       const errorMsg: ChatMessage = {
         id: Math.random().toString(36).substring(7),

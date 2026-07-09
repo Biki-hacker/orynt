@@ -67,5 +67,6 @@ type OperationsService interface {
 // AIService processes natural language queries grounded in Firestore data (RAG)
 type AIService interface {
 	Chat(ctx context.Context, req *models.AIChatRequest) (*models.AIChatResponse, error)
+	ChatStream(ctx context.Context, req *models.AIChatRequest, onChunk func(chunk *models.AIChatResponse) error) error
 	GetSustainabilityRecommendations(ctx context.Context, energyUsage float64, waterConsumption float64, wasteGenerated float64, attendance int) (string, error)
 }

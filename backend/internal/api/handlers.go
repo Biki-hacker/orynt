@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"orynt/internal/models"
 	"orynt/internal/service"
@@ -601,13 +602,24 @@ func (h *APIHandler) AIChat(c *gin.Context) {
 		req.Role = "public"
 	}
 
-	resp, err := h.aiService.Chat(c.Request.Context(), &req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// Set headers for Server-Sent Events (SSE)
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("Transfer-Encoding", "chunked")
 
-	c.JSON(http.StatusOK, resp)
+	c.Stream(func(w io.Writer) bool {
+		err := h.aiService.ChatStream(c.Request.Context(), &req, func(chunk *models.AIChatResponse) error {
+			c.SSEvent("message", chunk)
+			c.Writer.Flush()
+			return nil
+		})
+		if err != nil {
+			c.SSEvent("error", gin.H{"error": err.Error()})
+			c.Writer.Flush()
+		}
+		return false
+	})
 }
 
 // ----------------- AUDIT LOGS -----------------

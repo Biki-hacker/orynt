@@ -115,16 +115,27 @@ Current Stadium Live Context:
 
 User Role: %s`, contextInfo, req.Role)
 
+	var contents []geminiContent
+	for _, h := range req.History {
+		role := "user"
+		if h.Sender == "ai" {
+			role = "model"
+		}
+		contents = append(contents, geminiContent{
+			Role:  role,
+			Parts: []geminiPart{{Text: h.Text}},
+		})
+	}
+	contents = append(contents, geminiContent{
+		Role:  "user",
+		Parts: []geminiPart{{Text: req.Message}},
+	})
+
 	geminiReq := geminiRequest{
 		SystemInstruction: &geminiContent{
 			Parts: []geminiPart{{Text: systemPrompt}},
 		},
-		Contents: []geminiContent{
-			{
-				Role:  "user",
-				Parts: []geminiPart{{Text: req.Message}},
-			},
-		},
+		Contents: contents,
 	}
 
 	// Declare tools if user is a staff member
@@ -267,6 +278,261 @@ User Role: %s`, contextInfo, req.Role)
 		Response: part.Text,
 		Sources:  sources,
 	}, nil
+}
+
+func (s *aiService) ChatStream(ctx context.Context, req *models.AIChatRequest, onChunk func(chunk *models.AIChatResponse) error) error {
+	// 1. Gather context from Firestore/Database (RAG Grounding)
+	contextInfo, sources := s.gatherRAGContext(ctx, req.Role)
+
+	// If no Gemini API Key is provided, use our local fallback copilot / assistant
+	if s.apiKey == "" {
+		if respText, handled := s.parseAndExecuteLocalTool(ctx, req.Message, req.Role); handled {
+			return onChunk(&models.AIChatResponse{
+				Response: respText,
+				Sources:  append(sources, "Local AI Incident Copilot"),
+			})
+		}
+		response := s.generateLocalResponse(req.Message, contextInfo, req.Role)
+		
+		// Stream the response with word-by-word delays
+		words := strings.Fields(response)
+		for i, word := range words {
+			space := " "
+			if i == 0 {
+				space = ""
+			}
+			err := onChunk(&models.AIChatResponse{
+				Response: space + word,
+			})
+			if err != nil {
+				return err
+			}
+			time.Sleep(30 * time.Millisecond) // slight delay to simulate streaming
+		}
+		
+		// Send final sources chunk
+		return onChunk(&models.AIChatResponse{
+			Response: "",
+			Sources:  sources,
+		})
+	}
+
+	// 2. Format Request for Gemini (including system instructions and tools)
+	systemPrompt := fmt.Sprintf(`You are the Orynt Smart Stadium & Tournament Operations Assistant.
+You must answer questions from the perspective of an AI helper grounded in current stadium telemetry.
+Never hallucinate or guess. Use ONLY the facts provided below to ground your answer.
+If you don't know the answer or if it's not in the context, politely say so.
+
+Current Stadium Live Context:
+---
+%s
+---
+
+User Role: %s`, contextInfo, req.Role)
+
+	var contents []geminiContent
+	for _, h := range req.History {
+		role := "user"
+		if h.Sender == "ai" {
+			role = "model"
+		}
+		contents = append(contents, geminiContent{
+			Role:  role,
+			Parts: []geminiPart{{Text: h.Text}},
+		})
+	}
+	contents = append(contents, geminiContent{
+		Role:  "user",
+		Parts: []geminiPart{{Text: req.Message}},
+	})
+
+	geminiReq := geminiRequest{
+		SystemInstruction: &geminiContent{
+			Parts: []geminiPart{{Text: systemPrompt}},
+		},
+		Contents: contents,
+	}
+
+	// Declare tools if user is a staff member
+	isStaff := req.Role == "admin" || req.Role == "volunteer" || req.Role == "security" || req.Role == "medical" || req.Role == "cleaning" || req.Role == "parking" || req.Role == "transport" || req.Role == "ops"
+	if isStaff {
+		geminiReq.Tools = []geminiTool{
+			{
+				FunctionDeclarations: []geminiFunctionDeclaration{
+					{
+						Name:        "create_task",
+						Description: "Create a new operational, cleaning, or maintenance task for stadium staff.",
+						Parameters: &geminiParameters{
+							Type: "OBJECT",
+							Properties: map[string]geminiProperty{
+								"title": {
+									Type:        "STRING",
+									Description: "Short, descriptive title of the task (e.g. Spill cleanup at Section 106).",
+								},
+								"description": {
+									Type:        "STRING",
+									Description: "Detailed description of what needs to be done.",
+								},
+								"department": {
+									Type:        "STRING",
+									Description: "The department to assign to.",
+									Enum:        []string{"volunteer", "security", "medical", "cleaning", "parking", "transport", "ops"},
+								},
+								"priority": {
+									Type:        "STRING",
+									Description: "Priority level of the task.",
+									Enum:        []string{"low", "medium", "high"},
+								},
+							},
+							Required: []string{"title", "description", "department", "priority"},
+						},
+					},
+					{
+						Name:        "broadcast_alert",
+						Description: "Broadcast a critical, high-priority, or informational alert to the stadium banner.",
+						Parameters: &geminiParameters{
+							Type: "OBJECT",
+							Properties: map[string]geminiProperty{
+								"title": {
+									Type:        "STRING",
+									Description: "Brief title of the alert.",
+								},
+								"content": {
+									Type:        "STRING",
+									Description: "The main description or warning text of the alert.",
+								},
+								"severity": {
+									Type:        "STRING",
+									Description: "Severity level of the alert.",
+									Enum:        []string{"critical", "high", "info"},
+								},
+							},
+							Required: []string{"title", "content", "severity"},
+						},
+					},
+					{
+						Name:        "assign_medical_incident",
+						Description: "Assign a pending first-aid or medical emergency incident request to a volunteer or responder.",
+						Parameters: &geminiParameters{
+							Type: "OBJECT",
+							Properties: map[string]geminiProperty{
+								"incidentId": {
+									Type:        "STRING",
+									Description: "The medical request ID (e.g. med_12345).",
+								},
+								"volunteerId": {
+									Type:        "STRING",
+									Description: "The username or ID of the volunteer/responder to assign.",
+								},
+							},
+							Required: []string{"incidentId", "volunteerId"},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	// 3. Make HTTP streaming request to Gemini API
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?key=%s", s.apiKey)
+	reqJSON, err := json.Marshal(geminiReq)
+	if err != nil {
+		return err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqJSON))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		// Fallback to local response/tool if API call fails
+		if respText, handled := s.parseAndExecuteLocalTool(ctx, req.Message, req.Role); handled {
+			return onChunk(&models.AIChatResponse{
+				Response: respText + "\n\n*(Note: Gemini API returned an error, using local fallback Copilot)*",
+				Sources:  sources,
+			})
+		}
+		response := s.generateLocalResponse(req.Message, contextInfo, req.Role)
+		
+		// Stream the response with word-by-word delays
+		words := strings.Fields(response)
+		for i, word := range words {
+			space := " "
+			if i == 0 {
+				space = ""
+			}
+			err := onChunk(&models.AIChatResponse{
+				Response: space + word,
+			})
+			if err != nil {
+				return err
+			}
+			time.Sleep(30 * time.Millisecond)
+		}
+		return onChunk(&models.AIChatResponse{
+			Response: "\n\n*(Note: Gemini API returned an error, using local fallback assistant)*",
+			Sources:  sources,
+		})
+	}
+
+	var functionCall *geminiFunctionCall
+	dec := json.NewDecoder(resp.Body)
+
+	// Read open bracket '[' of Generative AI streaming array response
+	t, err := dec.Token()
+	if err == nil {
+		if delim, ok := t.(json.Delim); ok && delim == '[' {
+			for dec.More() {
+				var chunk geminiResponse
+				err := dec.Decode(&chunk)
+				if err != nil {
+					break
+				}
+
+				if len(chunk.Candidates) > 0 && len(chunk.Candidates[0].Content.Parts) > 0 {
+					part := chunk.Candidates[0].Content.Parts[0]
+					if part.FunctionCall != nil {
+						functionCall = part.FunctionCall
+						break
+					}
+					if part.Text != "" {
+						err := onChunk(&models.AIChatResponse{
+							Response: part.Text,
+						})
+						if err != nil {
+							return err
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if functionCall != nil {
+		respText, err := s.executeFunctionCall(ctx, functionCall)
+		if err != nil {
+			return err
+		}
+		return onChunk(&models.AIChatResponse{
+			Response: respText,
+			Sources:  append(sources, "Gemini AI Incident Copilot"),
+		})
+	}
+
+	// Send final response with sources
+	return onChunk(&models.AIChatResponse{
+		Response: "",
+		Sources:  sources,
+	})
 }
 
 func (s *aiService) gatherRAGContext(ctx context.Context, role string) (string, []string) {
