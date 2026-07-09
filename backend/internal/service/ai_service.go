@@ -260,3 +260,82 @@ func (s *aiService) generateLocalResponse(message string, contextInfo string, ro
 
 	return "I've analyzed your query, but I don't see direct matches in the live telemetry. Generally, you can view the Live Tournament schedules, Stadium Map, Parking sensors, and Transit feeds directly on the dashboard. Is there a specific section or incident you'd like to check?"
 }
+
+func (s *aiService) GetSustainabilityRecommendations(ctx context.Context, energyUsage float64, waterConsumption float64, wasteGenerated float64, attendance int) (string, error) {
+	// If no Gemini API Key is provided, use our local fallback advisor
+	if s.apiKey == "" {
+		return s.generateLocalSustainabilityRecommendations(energyUsage, waterConsumption, wasteGenerated, attendance), nil
+	}
+
+	// Format prompt for Gemini Eco-Advisor
+	systemPrompt := `You are the Orynt Arena Eco-Advisor. Analyze the current stadium sustainability metrics:
+- Attendance: %d
+- Energy Usage: %.1f kW
+- Water Consumption: %.1f L
+- Waste Generated: %.1f kg
+
+Provide exactly 3 specific, actionable recommendations to improve stadium sustainability. 
+Keep them highly realistic and related to crowd management, lighting, water usage, transit, or waste disposal.
+Ensure the tone is professional, operational, and concise. Format as a clean markdown list (no headers).`
+
+	promptText := fmt.Sprintf(systemPrompt, attendance, energyUsage, waterConsumption, wasteGenerated)
+
+	geminiReq := geminiRequest{
+		Contents: []geminiContent{
+			{
+				Role:  "user",
+				Parts: []geminiPart{{Text: promptText}},
+			},
+		},
+	}
+
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%s", s.apiKey)
+	reqJSON, err := json.Marshal(geminiReq)
+	if err != nil {
+		return "", err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqJSON))
+	if err != nil {
+		return "", err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return s.generateLocalSustainabilityRecommendations(energyUsage, waterConsumption, wasteGenerated, attendance), nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return s.generateLocalSustainabilityRecommendations(energyUsage, waterConsumption, wasteGenerated, attendance), nil
+	}
+
+	var geminiResp geminiResponse
+	if err := json.NewDecoder(resp.Body).Decode(&geminiResp); err != nil {
+		return s.generateLocalSustainabilityRecommendations(energyUsage, waterConsumption, wasteGenerated, attendance), nil
+	}
+
+	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
+		return s.generateLocalSustainabilityRecommendations(energyUsage, waterConsumption, wasteGenerated, attendance), nil
+	}
+
+	return geminiResp.Candidates[0].Content.Parts[0].Text, nil
+}
+
+func (s *aiService) generateLocalSustainabilityRecommendations(energyUsage float64, waterConsumption float64, wasteGenerated float64, attendance int) string {
+	if attendance > 40000 {
+		return `- **Optimize Shuttle Bus Transit**: Coordinate with city transit to adjust the shuttle frequency on electric line route link 1, reducing idle times by 20% to save fuel/energy.
+- **Waste Bin Collection Frequency**: High density zones detected in North Stand. Dispatch cleaning crews to deploy additional recycling bins near concessions to minimize contamination rates.
+- **Water Flow Control**: Recommend enabling smart automated sensor limits in high-density restroom sections (Sections 102 & 115) to conserve water usage by 15% during peak halftime.`
+	} else if attendance > 15000 {
+		return `- **HVAC Zone Optimization**: Restrict cooling/ventilation systems in empty administrative areas and VIP Suites not currently booked.
+- **LED Lighting Optimization**: Shift non-critical corridor lights and digital signage in lower levels to energy-saving standby mode during active play.
+- **Concession Waste Management**: Starlights Concessions at Section 104 has moderate queues. Ensure biodegradable packaging protocols are active for hotdog containers.`
+	} else {
+		return `- **Power-Down Inactive Zones**: Attendance is low. Completely dim floodlighting in secondary sections and lock unused public entrances (Gates 3 & 4) to conserve standby power.
+- **Low-Flow Restroom Mode**: Switch stadium-wide restroom plumbing systems to eco low-pressure modes since crowd size is minimal.
+- **Shuttle Consolidation**: Merge bus lines 1 & 2 into a single circular shuttle route to reduce emissions and electricity/fuel usage.`
+	}
+}

@@ -679,3 +679,61 @@ func (h *APIHandler) logAdminAction(c *gin.Context, action string, resource stri
 
 	_ = h.opsService.CreateAuditLog(context.Background(), log)
 }
+
+func (h *APIHandler) GetSustainabilityMetrics(c *gin.Context) {
+	zones, _ := h.stadService.GetCrowdZones(c.Request.Context(), "stadium_01")
+
+	currentTotalCrowd := 0
+	for _, z := range zones {
+		currentTotalCrowd += z.CurrentOccupancy
+	}
+
+	// Compute current metrics
+	energy := float64(1800 + currentTotalCrowd/50)
+	water := float64(12000 + currentTotalCrowd/4)
+	waste := float64(420 + currentTotalCrowd/120)
+
+	// Generate 6 hours of historical data points representing match progress
+	historicalPoints := []gin.H{}
+	now := time.Now()
+	attendanceTrend := []int{
+		int(float64(currentTotalCrowd) * 0.15), // 5 hrs ago (gates open)
+		int(float64(currentTotalCrowd) * 0.45), // 4 hrs ago
+		int(float64(currentTotalCrowd) * 0.85), // 3 hrs ago (warmups)
+		int(float64(currentTotalCrowd) * 0.98), // 2 hrs ago (kickoff)
+		int(float64(currentTotalCrowd) * 1.00), // 1 hr ago (halftime)
+		currentTotalCrowd,                      // Current
+	}
+
+	for i, att := range attendanceTrend {
+		histTime := now.Add(time.Duration(-5+i) * time.Hour).Format("15:04")
+		histEnergy := 1000.0 + float64(att)/45.0 + float64(i*80)
+		histWater := 5000.0 + float64(att)/3.5 + float64(i*200)
+		histWaste := 100.0 + float64(att)/100.0 + float64(i*15)
+
+		historicalPoints = append(historicalPoints, gin.H{
+			"time":              histTime,
+			"attendance":        att,
+			"energyUsageKw":     int(histEnergy),
+			"waterConsumptionL": int(histWater),
+			"wasteGeneratedKg":  int(histWaste),
+		})
+	}
+
+	// Call Gemini Eco-Advisor for recommendations
+	recs, err := h.aiService.GetSustainabilityRecommendations(c.Request.Context(), energy, water, waste, currentTotalCrowd)
+	if err != nil {
+		recs = "No sustainability recommendations available at this time."
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"current": gin.H{
+			"attendance":        currentTotalCrowd,
+			"energyUsageKw":     energy,
+			"waterConsumptionL": water,
+			"wasteGeneratedKg":  waste,
+		},
+		"historical":      historicalPoints,
+		"recommendations": recs,
+	})
+}

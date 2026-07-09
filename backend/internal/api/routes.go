@@ -50,6 +50,9 @@ func SetupRouter(handler *APIHandler, wsHub *WSHub, pubSub repository.PubSubRepo
 		// RAG AI Chat (grounded queries)
 		api.POST("/ai/chat", handler.AIChat)
 
+		// Sustainability Dashboard Metrics & Recommendations
+		api.GET("/sustainability", handler.GetSustainabilityMetrics)
+
 		// ----------------- SECURE STAFF ENDPOINTS -----------------
 		staff := api.Group("")
 		staff.Use(AuthMiddleware(handler.authService))

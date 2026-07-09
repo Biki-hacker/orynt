@@ -181,3 +181,22 @@ export interface AIChatResponse {
   response: string;
   sources: string[];
 }
+
+export interface SustainabilityHistoricalPoint {
+  time: string;
+  attendance: number;
+  energyUsageKw: number;
+  waterConsumptionL: number;
+  wasteGeneratedKg: number;
+}
+
+export interface SustainabilityMetrics {
+  current: {
+    attendance: number;
+    energyUsageKw: number;
+    waterConsumptionL: number;
+    wasteGeneratedKg: number;
+  };
+  historical: SustainabilityHistoricalPoint[];
+  recommendations: string;
+}

@@ -7,6 +7,7 @@ import { MatchDetails } from './pages/Public/MatchDetails'
 import { VenueMapPage } from './pages/Public/VenueMapPage'
 import { TransportParking } from './pages/Public/TransportParking'
 import { FoodFAQ } from './pages/Public/FoodFAQ'
+import { Sustainability } from './pages/Public/Sustainability'
 import { Login } from './pages/Auth/Login'
 import { StaffDashboard } from './pages/Staff/StaffDashboard'
 import { AdminDashboard } from './pages/Admin/AdminDashboard'
@@ -32,6 +33,7 @@ export const App: React.FC = () => {
             <Route path="/map" element={<VenueMapPage />} />
             <Route path="/transport" element={<TransportParking />} />
             <Route path="/food-faq" element={<FoodFAQ />} />
+            <Route path="/sustainability" element={<Sustainability />} />
             <Route path="/login" element={<Login />} />
           </Route>
 

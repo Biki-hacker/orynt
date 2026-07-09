@@ -93,7 +93,8 @@ export const PublicLayout: React.FC = () => {
     { label: 'Live Tournament', path: '/' },
     { label: 'Stadium Map', path: '/map' },
     { label: 'Transport & Parking', path: '/transport' },
-    { label: 'Food & FAQ', path: '/food-faq' }
+    { label: 'Food & FAQ', path: '/food-faq' },
+    { label: 'Sustainability', path: '/sustainability' }
   ]
 
   return (
