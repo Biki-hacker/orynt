@@ -24,7 +24,7 @@ func main() {
 	tournSvc := service.NewTournamentService(dbRepo, pubSubRepo)
 	stadSvc := service.NewStadiumService(dbRepo, pubSubRepo)
 	opsSvc := service.NewOperationsService(dbRepo, pubSubRepo)
-	aiSvc := service.NewAIService(dbRepo) // reads GEMINI_API_KEY internally
+	aiSvc := service.NewAIService(dbRepo, pubSubRepo) // reads GEMINI_API_KEY internally
 
 	// 4. Initialize WebSockets Hub
 	wsHub := api.NewWSHub()

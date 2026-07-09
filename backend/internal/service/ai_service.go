@@ -14,15 +14,17 @@ import (
 )
 
 type aiService struct {
-	dbRepo repository.DBRepository
-	apiKey string
+	dbRepo     repository.DBRepository
+	pubSubRepo repository.PubSubRepository
+	apiKey     string
 }
 
 // NewAIService constructs a concrete RAG AI Assistant service
-func NewAIService(dbRepo repository.DBRepository) AIService {
+func NewAIService(dbRepo repository.DBRepository, pubSubRepo repository.PubSubRepository) AIService {
 	return &aiService{
-		dbRepo: dbRepo,
-		apiKey: os.Getenv("GEMINI_API_KEY"),
+		dbRepo:     dbRepo,
+		pubSubRepo: pubSubRepo,
+		apiKey:     os.Getenv("GEMINI_API_KEY"),
 	}
 }
 
@@ -33,30 +35,66 @@ type geminiContent struct {
 }
 
 type geminiPart struct {
-	Text string `json:"text"`
+	Text         string              `json:"text,omitempty"`
+	FunctionCall *geminiFunctionCall `json:"functionCall,omitempty"`
 }
 
 type geminiRequest struct {
-	Contents         []geminiContent `json:"contents"`
+	Contents          []geminiContent `json:"contents"`
 	SystemInstruction *geminiContent  `json:"systemInstruction,omitempty"`
+	Tools             []geminiTool    `json:"tools,omitempty"`
 }
 
 type geminiResponse struct {
 	Candidates []struct {
 		Content struct {
 			Parts []struct {
-				Text string `json:"text"`
+				Text         string              `json:"text"`
+				FunctionCall *geminiFunctionCall `json:"functionCall,omitempty"`
 			} `json:"parts"`
 		} `json:"content"`
 	} `json:"candidates"`
+}
+
+type geminiFunctionCall struct {
+	Name string          `json:"name"`
+	Args json.RawMessage `json:"args"`
+}
+
+type geminiTool struct {
+	FunctionDeclarations []geminiFunctionDeclaration `json:"functionDeclarations"`
+}
+
+type geminiFunctionDeclaration struct {
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Parameters  *geminiParameters `json:"parameters"`
+}
+
+type geminiParameters struct {
+	Type       string                    `json:"type"`
+	Properties map[string]geminiProperty `json:"properties"`
+	Required   []string                  `json:"required,omitempty"`
+}
+
+type geminiProperty struct {
+	Type        string   `json:"type"`
+	Description string   `json:"description,omitempty"`
+	Enum        []string `json:"enum,omitempty"`
 }
 
 func (s *aiService) Chat(ctx context.Context, req *models.AIChatRequest) (*models.AIChatResponse, error) {
 	// 1. Gather context from Firestore/Database (RAG Grounding)
 	contextInfo, sources := s.gatherRAGContext(ctx, req.Role)
 
-	// If no Gemini API Key is provided, use our intelligent local rule-based system
+	// If no Gemini API Key is provided, use our local fallback copilot / assistant
 	if s.apiKey == "" {
+		if respText, handled := s.parseAndExecuteLocalTool(ctx, req.Message, req.Role); handled {
+			return &models.AIChatResponse{
+				Response: respText,
+				Sources:  append(sources, "Local AI Incident Copilot"),
+			}, nil
+		}
 		response := s.generateLocalResponse(req.Message, contextInfo, req.Role)
 		return &models.AIChatResponse{
 			Response: response,
@@ -64,7 +102,7 @@ func (s *aiService) Chat(ctx context.Context, req *models.AIChatRequest) (*model
 		}, nil
 	}
 
-	// 2. Format Request for Gemini
+	// 2. Format Request for Gemini (including system instructions and tools)
 	systemPrompt := fmt.Sprintf(`You are the Orynt Smart Stadium & Tournament Operations Assistant.
 You must answer questions from the perspective of an AI helper grounded in current stadium telemetry.
 Never hallucinate or guess. Use ONLY the facts provided below to ground your answer.
@@ -89,6 +127,86 @@ User Role: %s`, contextInfo, req.Role)
 		},
 	}
 
+	// Declare tools if user is a staff member
+	isStaff := req.Role == "admin" || req.Role == "volunteer" || req.Role == "security" || req.Role == "medical" || req.Role == "cleaning" || req.Role == "parking" || req.Role == "transport" || req.Role == "ops"
+	if isStaff {
+		geminiReq.Tools = []geminiTool{
+			{
+				FunctionDeclarations: []geminiFunctionDeclaration{
+					{
+						Name:        "create_task",
+						Description: "Create a new operational, cleaning, or maintenance task for stadium staff.",
+						Parameters: &geminiParameters{
+							Type: "OBJECT",
+							Properties: map[string]geminiProperty{
+								"title": {
+									Type:        "STRING",
+									Description: "Short, descriptive title of the task (e.g. Spill cleanup at Section 106).",
+								},
+								"description": {
+									Type:        "STRING",
+									Description: "Detailed description of what needs to be done.",
+								},
+								"department": {
+									Type:        "STRING",
+									Description: "The department to assign to.",
+									Enum:        []string{"volunteer", "security", "medical", "cleaning", "parking", "transport", "ops"},
+								},
+								"priority": {
+									Type:        "STRING",
+									Description: "Priority level of the task.",
+									Enum:        []string{"low", "medium", "high"},
+								},
+							},
+							Required: []string{"title", "description", "department", "priority"},
+						},
+					},
+					{
+						Name:        "broadcast_alert",
+						Description: "Broadcast a critical, high-priority, or informational alert to the stadium banner.",
+						Parameters: &geminiParameters{
+							Type: "OBJECT",
+							Properties: map[string]geminiProperty{
+								"title": {
+									Type:        "STRING",
+									Description: "Brief title of the alert.",
+								},
+								"content": {
+									Type:        "STRING",
+									Description: "The main description or warning text of the alert.",
+								},
+								"severity": {
+									Type:        "STRING",
+									Description: "Severity level of the alert.",
+									Enum:        []string{"critical", "high", "info"},
+								},
+							},
+							Required: []string{"title", "content", "severity"},
+						},
+					},
+					{
+						Name:        "assign_medical_incident",
+						Description: "Assign a pending first-aid or medical emergency incident request to a volunteer or responder.",
+						Parameters: &geminiParameters{
+							Type: "OBJECT",
+							Properties: map[string]geminiProperty{
+								"incidentId": {
+									Type:        "STRING",
+									Description: "The medical request ID (e.g. med_12345).",
+								},
+								"volunteerId": {
+									Type:        "STRING",
+									Description: "The username or ID of the volunteer/responder to assign.",
+								},
+							},
+							Required: []string{"incidentId", "volunteerId"},
+						},
+					},
+				},
+			},
+		}
+	}
+
 	// 3. Make HTTP request to Gemini API
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%s", s.apiKey)
 	reqJSON, err := json.Marshal(geminiReq)
@@ -110,7 +228,13 @@ User Role: %s`, contextInfo, req.Role)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		// Fallback to local response if API call fails
+		// Fallback to local response/tool if API call fails
+		if respText, handled := s.parseAndExecuteLocalTool(ctx, req.Message, req.Role); handled {
+			return &models.AIChatResponse{
+				Response: respText + "\n\n*(Note: Gemini API returned an error, using local fallback Copilot)*",
+				Sources:  sources,
+			}, nil
+		}
 		response := s.generateLocalResponse(req.Message, contextInfo, req.Role)
 		return &models.AIChatResponse{
 			Response: response + "\n\n*(Note: Gemini API returned an error, using local fallback assistant)*",
@@ -127,8 +251,20 @@ User Role: %s`, contextInfo, req.Role)
 		return nil, fmt.Errorf("empty response from Gemini")
 	}
 
+	part := geminiResp.Candidates[0].Content.Parts[0]
+	if part.FunctionCall != nil {
+		respText, err := s.executeFunctionCall(ctx, part.FunctionCall)
+		if err != nil {
+			return nil, err
+		}
+		return &models.AIChatResponse{
+			Response: respText,
+			Sources:  append(sources, "Gemini AI Incident Copilot"),
+		}, nil
+	}
+
 	return &models.AIChatResponse{
-		Response: geminiResp.Candidates[0].Content.Parts[0].Text,
+		Response: part.Text,
 		Sources:  sources,
 	}, nil
 }
@@ -339,3 +475,239 @@ func (s *aiService) generateLocalSustainabilityRecommendations(energyUsage float
 - **Shuttle Consolidation**: Merge bus lines 1 & 2 into a single circular shuttle route to reduce emissions and electricity/fuel usage.`
 	}
 }
+
+// executeFunctionCall performs DB mutation and publishes updates via WebSockets
+func (s *aiService) executeFunctionCall(ctx context.Context, call *geminiFunctionCall) (string, error) {
+	switch call.Name {
+	case "create_task":
+		var args struct {
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			Department  string `json:"department"`
+			Priority    string `json:"priority"`
+		}
+		if err := json.Unmarshal(call.Args, &args); err != nil {
+			return "", err
+		}
+
+		task := &models.Task{
+			ID:          fmt.Sprintf("task_%d", time.Now().UnixNano()),
+			Title:       args.Title,
+			Description: args.Description,
+			AssignedTo:  "unassigned",
+			Status:      "todo",
+			Priority:    args.Priority,
+			Department:  args.Department,
+			CreatedAt:   time.Now(),
+		}
+		err := s.dbRepo.CreateTask(ctx, task)
+		if err != nil {
+			return fmt.Sprintf("⚠️ Failed to create task: %v", err), nil
+		}
+
+		msg := models.WSMessage{
+			Type:    "task_update",
+			Payload: task,
+		}
+		_ = s.pubSubRepo.Publish(ctx, "tasks", msg)
+
+		return fmt.Sprintf("📋 **Incident Copilot:** Created task **'%s'** (Priority: **%s**) for the **%s** department. Staff has been notified.", args.Title, args.Priority, args.Department), nil
+
+	case "broadcast_alert":
+		var args struct {
+			Title    string `json:"title"`
+			Content  string `json:"content"`
+			Severity string `json:"severity"`
+		}
+		if err := json.Unmarshal(call.Args, &args); err != nil {
+			return "", err
+		}
+
+		alert := &models.Alert{
+			ID:        fmt.Sprintf("alert_%d", time.Now().UnixNano()),
+			Title:     args.Title,
+			Content:   args.Content,
+			Type:      "ops",
+			Severity:  args.Severity,
+			CreatedAt: time.Now(),
+			Active:    true,
+		}
+		err := s.dbRepo.CreateAlert(ctx, alert)
+		if err != nil {
+			return fmt.Sprintf("⚠️ Failed to broadcast alert: %v", err), nil
+		}
+
+		msg := models.WSMessage{
+			Type:    "alert",
+			Payload: alert,
+		}
+		_ = s.pubSubRepo.Publish(ctx, "alerts", msg)
+
+		return fmt.Sprintf("🚨 **Incident Copilot:** Broadcasted **[%s]** alert: **'%s'** - *%s*.", strings.ToUpper(args.Severity), args.Title, args.Content), nil
+
+	case "assign_medical_incident":
+		var args struct {
+			IncidentID  string `json:"incidentId"`
+			VolunteerID string `json:"volunteerId"`
+		}
+		if err := json.Unmarshal(call.Args, &args); err != nil {
+			return "", err
+		}
+
+		err := s.dbRepo.UpdateMedicalRequestStatus(ctx, args.IncidentID, "assigned", args.VolunteerID)
+		if err != nil {
+			return fmt.Sprintf("⚠️ Failed to assign medical request: %v", err), nil
+		}
+
+		requests, err := s.dbRepo.ListMedicalRequests(ctx)
+		if err == nil {
+			var updatedReq models.MedicalRequest
+			for _, r := range requests {
+				if r.ID == args.IncidentID {
+					updatedReq = r
+					break
+				}
+			}
+			if updatedReq.ID != "" {
+				msg := models.WSMessage{
+					Type:    "medical_update",
+					Payload: updatedReq,
+				}
+				_ = s.pubSubRepo.Publish(ctx, "medical", msg)
+			}
+		}
+
+		return fmt.Sprintf("🏥 **Incident Copilot:** Assigned medical incident **%s** to responder **%s**.", args.IncidentID, args.VolunteerID), nil
+	}
+
+	return "Unknown tool call", nil
+}
+
+// parseAndExecuteLocalTool parses staff chat messages locally and executes matching tool behavior
+func (s *aiService) parseAndExecuteLocalTool(ctx context.Context, message string, role string) (string, bool) {
+	isStaff := role == "admin" || role == "volunteer" || role == "security" || role == "medical" || role == "cleaning" || role == "parking" || role == "transport" || role == "ops"
+	if !isStaff {
+		return "", false
+	}
+
+	msgLower := strings.ToLower(message)
+
+	// 1. Detect task creation
+	if strings.Contains(msgLower, "create task") || strings.Contains(msgLower, "create a task") || strings.Contains(msgLower, "create volunteer task") || strings.Contains(msgLower, "create cleaning task") {
+		title := "Cleanup Request"
+		desc := "spill cleanup at stadium concourse"
+		dept := "cleaning"
+		prio := "medium"
+
+		if strings.Contains(msgLower, "spill") || strings.Contains(msgLower, "clean") {
+			title = "Spill Cleanup at Stall"
+			desc = "Spill reported by guest near Food Stall A. Immediate cleanup requested."
+			dept = "cleaning"
+			prio = "high"
+		} else if strings.Contains(msgLower, "security") || strings.Contains(msgLower, "fight") {
+			title = "Security Patrol Dispatch"
+			desc = "Security assistance required in the stands."
+			dept = "security"
+			prio = "high"
+		} else if strings.Contains(msgLower, "volunteer") {
+			title = "Volunteer Assistance"
+			desc = "Assistance needed at main entrance gates."
+			dept = "volunteer"
+			prio = "low"
+		}
+
+		task := &models.Task{
+			ID:          fmt.Sprintf("task_%d", time.Now().UnixNano()),
+			Title:       title,
+			Description: desc,
+			AssignedTo:  "unassigned",
+			Status:      "todo",
+			Priority:    prio,
+			Department:  dept,
+			CreatedAt:   time.Now(),
+		}
+		_ = s.dbRepo.CreateTask(ctx, task)
+		
+		msg := models.WSMessage{
+			Type:    "task_update",
+			Payload: task,
+		}
+		_ = s.pubSubRepo.Publish(ctx, "tasks", msg)
+
+		return fmt.Sprintf("📋 **Incident Copilot:** Created task **'%s'** (Priority: **%s**) for the **%s** department and broadcasted it to the Kanban board.", title, prio, dept), true
+	}
+
+	// 2. Detect alert broadcast
+	if strings.Contains(msgLower, "broadcast alert") || strings.Contains(msgLower, "broadcast a transit delay alert") || strings.Contains(msgLower, "broadcast an alert") {
+		title := "Transit Service Update"
+		content := "Transit delay reported on Line 1. Expect minor delays."
+		sev := "high"
+
+		if strings.Contains(msgLower, "delay") || strings.Contains(msgLower, "transit") {
+			title = "Transit Delay Alert"
+			content = "Line 1 Shuttle Service is experiencing delays up to 15 minutes due to heavy post-game traffic."
+			sev = "info"
+		} else if strings.Contains(msgLower, "emergency") || strings.Contains(msgLower, "critical") {
+			title = "CONGESTION ALERT"
+			content = "Severe congestion at Gate A. Avoid area and use Gate B."
+			sev = "critical"
+		}
+
+		alert := &models.Alert{
+			ID:        fmt.Sprintf("alert_%d", time.Now().UnixNano()),
+			Title:     title,
+			Content:   content,
+			Type:      "ops",
+			Severity:  sev,
+			CreatedAt: time.Now(),
+			Active:    true,
+		}
+		_ = s.dbRepo.CreateAlert(ctx, alert)
+
+		msg := models.WSMessage{
+			Type:    "alert",
+			Payload: alert,
+		}
+		_ = s.pubSubRepo.Publish(ctx, "alerts", msg)
+
+		return fmt.Sprintf("🚨 **Incident Copilot:** Broadcasted **[%s]** alert: **'%s'** - *%s*.", strings.ToUpper(sev), title, content), true
+	}
+
+	// 3. Detect medical assignment
+	if strings.Contains(msgLower, "assign medical") || strings.Contains(msgLower, "assign incident") {
+		incidentId := "med_01"
+		volunteerId := "medical1"
+
+		words := strings.Fields(msgLower)
+		for _, w := range words {
+			if strings.HasPrefix(w, "med_") || strings.HasPrefix(w, "med-") {
+				incidentId = w
+				break
+			}
+		}
+
+		_ = s.dbRepo.UpdateMedicalRequestStatus(ctx, incidentId, "assigned", volunteerId)
+		requests, err := s.dbRepo.ListMedicalRequests(ctx)
+		if err == nil {
+			var updatedReq models.MedicalRequest
+			for _, r := range requests {
+				if r.ID == incidentId {
+					updatedReq = r
+					break
+				}
+			}
+			if updatedReq.ID != "" {
+				msg := models.WSMessage{
+					Type:    "medical_update",
+					Payload: updatedReq,
+				}
+				_ = s.pubSubRepo.Publish(ctx, "medical", msg)
+			}
+		}
+
+		return fmt.Sprintf("🏥 **Incident Copilot:** Assigned medical incident **%s** to responder **%s** and broadcasted it to the operations dashboard.", incidentId, volunteerId), true
+	}
+
+	return "", false
+}
+

@@ -6,6 +6,7 @@ import (
 	"orynt/internal/models"
 	"orynt/internal/service"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -574,8 +575,24 @@ func (h *APIHandler) AIChat(c *gin.Context) {
 		return
 	}
 
-	// Double check user role context
+	// Double check user role context, parsing token manually if auth middleware was skipped (public route)
 	userObj, exists := c.Get("currentUser")
+	if !exists {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" {
+			parts := strings.Split(authHeader, " ")
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				tokenStr := parts[1]
+				user, err := h.authService.ValidateToken(tokenStr)
+				if err == nil {
+					userObj = user
+					exists = true
+					c.Set("currentUser", user)
+				}
+			}
+		}
+	}
+
 	if exists {
 		if user, ok := userObj.(*models.User); ok {
 			req.Role = user.Role
