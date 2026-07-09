@@ -205,6 +205,15 @@ func (h *APIHandler) GetCrowdZones(c *gin.Context) {
 	c.JSON(http.StatusOK, zones)
 }
 
+func (h *APIHandler) GetExitRoutes(c *gin.Context) {
+	routes, err := h.stadService.GetExitRoutes(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, routes)
+}
+
 func (h *APIHandler) UpdateCrowdZone(c *gin.Context) {
 	zID := c.Param("id")
 	var req struct {

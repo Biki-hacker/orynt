@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { CrowdZone, Facility } from '../../types'
+import { CrowdZone, Facility, ExitRoute } from '../../types'
 import { api } from '../../services/api'
 import { wsService } from '../../services/websocket'
-import { Shield, AlertTriangle, Accessibility, Coffee, BadgeAlert, Compass } from 'lucide-react'
+import { Shield, AlertTriangle, Accessibility, Coffee, BadgeAlert, Compass, Navigation } from 'lucide-react'
 
 interface StadiumMapProps {
   onSectionSelect?: (zone: CrowdZone | null) => void;
@@ -12,6 +12,8 @@ export const StadiumMap: React.FC<StadiumMapProps> = ({ onSectionSelect }) => {
   const [zones, setZones] = useState<CrowdZone[]>([])
   const [selectedZone, setSelectedZone] = useState<CrowdZone | null>(null)
   const [activeFilter, setActiveFilter] = useState<'all' | 'food' | 'restroom' | 'medical' | 'exit' | 'accessible'>('all')
+  const [exitRoutes, setExitRoutes] = useState<ExitRoute[]>([])
+  const [showExitAssistance, setShowExitAssistance] = useState<boolean>(false)
 
   useEffect(() => {
     // Fetch initial zones
@@ -23,12 +25,24 @@ export const StadiumMap: React.FC<StadiumMapProps> = ({ onSectionSelect }) => {
         console.error(err)
       }
     }
+
+    const loadExitRoutes = async () => {
+      try {
+        const data = await api.get<ExitRoute[]>('/stadium/exit-routing')
+        setExitRoutes(data)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
     loadZones()
+    loadExitRoutes()
 
     // Listen to real-time density updates
     const unsub = wsService.subscribe('crowd_density', (updatedZone: CrowdZone) => {
       setZones((prev) => prev.map((z) => (z.id === updatedZone.id ? updatedZone : z)))
       setSelectedZone((curr) => (curr && curr.id === updatedZone.id ? updatedZone : curr))
+      loadExitRoutes() // Refresh exit routes when crowd density changes dynamically
     })
 
     return () => unsub()
@@ -76,6 +90,8 @@ export const StadiumMap: React.FC<StadiumMapProps> = ({ onSectionSelect }) => {
     { id: 'medical', label: 'First Aid', icon: BadgeAlert }
   ]
 
+  const selectedRoute = selectedZone ? exitRoutes.find((r) => r.zoneId === selectedZone.id) : null
+
   return (
     <div className="flex flex-col lg:flex-row gap-6 bg-white border border-zinc-200 rounded-lg p-6 shadow-sm">
       {/* SVG Stadium Map */}
@@ -99,6 +115,18 @@ export const StadiumMap: React.FC<StadiumMapProps> = ({ onSectionSelect }) => {
               </button>
             )
           })}
+          
+          <button
+            onClick={() => setShowExitAssistance(!showExitAssistance)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-150 ${
+              showExitAssistance
+                ? 'bg-blue-600 border-blue-600 text-white shadow-sm hover:bg-blue-700'
+                : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+            }`}
+          >
+            <Navigation className="w-3.5 h-3.5 rotate-45" />
+            <span>Exit Routing Assistance</span>
+          </button>
         </div>
 
         {/* Stadium Layout */}
@@ -159,6 +187,67 @@ export const StadiumMap: React.FC<StadiumMapProps> = ({ onSectionSelect }) => {
                 <circle cx="300" cy="120" r="6" fill="#3b82f6" />
               </g>
             )}
+
+            {/* Defs for arrow markers */}
+            <defs>
+              <marker
+                id="exit-arrow"
+                viewBox="0 0 10 10"
+                refX="6"
+                refY="5"
+                markerWidth="5"
+                markerHeight="5"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 2 L 7 5 L 0 8 z" fill="context-stroke" />
+              </marker>
+            </defs>
+
+            {/* CSS Animation for exit flow */}
+            <style>{`
+              @keyframes exitFlow {
+                to {
+                  stroke-dashoffset: -20;
+                }
+              }
+              .exit-route-path {
+                stroke-dasharray: 8, 6;
+                animation: exitFlow 1s linear infinite;
+              }
+            `}</style>
+
+            {/* Smart Exit Routing Paths */}
+            {showExitAssistance && exitRoutes.map((route) => {
+              const pathString = route.pathPoints.reduce((acc, p, idx) => {
+                return acc + (idx === 0 ? `M ${p.x} ${p.y}` : ` L ${p.x} ${p.y}`)
+              }, '')
+
+              const isSelected = selectedZone?.id === route.zoneId
+              
+              // Set stroke colors based on congestion
+              let strokeColor = '#3b82f6' // clear / low
+              if (route.congestionLevel === 'high') strokeColor = '#ef4444'
+              else if (route.congestionLevel === 'medium') strokeColor = '#f59e0b'
+
+              return (
+                <path
+                  key={route.zoneId}
+                  d={pathString}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth={isSelected ? 5 : 2.5}
+                  strokeOpacity={selectedZone ? (isSelected ? 1.0 : 0.2) : 0.75}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="exit-route-path"
+                  style={{
+                    filter: isSelected ? `drop-shadow(0 0 4px ${strokeColor})` : 'none',
+                    transition: 'stroke-width 0.2s, stroke-opacity 0.2s',
+                  }}
+                  markerEnd="url(#exit-arrow)"
+                />
+              )
+            })}
 
             {/* Facilities Overlay Icons */}
             {facilities.map((fac) => {
@@ -241,6 +330,53 @@ export const StadiumMap: React.FC<StadiumMapProps> = ({ onSectionSelect }) => {
                   <p className="text-xs text-blue-700 leading-normal">
                     <strong>Accessible Route:</strong> Elevator 1 is active directly on the concourse level of this stand.
                   </p>
+                </div>
+              )}
+
+              {showExitAssistance && selectedRoute && (
+                <div className="mt-4 p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 uppercase tracking-wide">
+                    <Navigation className="w-3.5 h-3.5 text-blue-600 rotate-45 animate-pulse" />
+                    <span>Smart Exit Routing</span>
+                  </div>
+                  
+                  <div className="mt-2.5 space-y-2">
+                    <div>
+                      <span className="text-[10px] text-zinc-400 block uppercase font-medium">Recommended Exit</span>
+                      <span className="text-sm font-bold text-neutral-800">
+                        {selectedRoute.exitName}
+                      </span>
+                    </div>
+                    
+                    <div>
+                      <span className="text-[10px] text-zinc-400 block uppercase font-medium">Route Congestion</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-0.5 ${
+                        selectedRoute.congestionLevel === 'high'
+                          ? 'bg-red-100 text-red-700'
+                          : selectedRoute.congestionLevel === 'medium'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-emerald-100 text-emerald-700'
+                      }`}>
+                        {selectedRoute.congestionLevel.toUpperCase()}
+                      </span>
+                    </div>
+                    
+                    {selectedZone.id === 'z1' && selectedRoute.recommendedExit === 'e2' && (
+                      <div className="p-2 bg-blue-50 border border-blue-100 rounded text-[11px] text-blue-800 leading-normal flex gap-1.5 items-start">
+                        <AlertTriangle className="w-3.5 h-3.5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <span>
+                          <strong>Dynamic Divert Active:</strong> Rerouted to Gate B to prevent crowd crush at Gate A.
+                        </span>
+                      </div>
+                    )}
+
+                    <div>
+                      <span className="text-[10px] text-zinc-400 block uppercase font-medium">Wayfinding Guidance</span>
+                      <p className="text-xs text-neutral-600 leading-normal mt-0.5">
+                        {selectedRoute.reason}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

@@ -200,3 +200,19 @@ export interface SustainabilityMetrics {
   historical: SustainabilityHistoricalPoint[];
   recommendations: string;
 }
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface ExitRoute {
+  zoneId: string;
+  zoneName: string;
+  recommendedExit: string;
+  exitName: string;
+  congestionLevel: 'low' | 'medium' | 'high';
+  pathPoints: Point[];
+  reason: string;
+}
+

@@ -218,3 +218,21 @@ type WSMessage struct {
 	Type    string      `json:"type"`    // e.g. "match_score", "crowd_density", "alert", "task_update", "announcement"
 	Payload interface{} `json:"payload"`
 }
+
+// Point represents a coordinate in 2D space
+type Point struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+// ExitRoute represents optimal route suggestions for crowd management
+type ExitRoute struct {
+	ZoneID          string  `json:"zoneId"`
+	ZoneName        string  `json:"zoneName"`
+	RecommendedExit string  `json:"recommendedExit"`
+	ExitName        string  `json:"exitName"`
+	CongestionLevel string  `json:"congestionLevel"`
+	PathPoints      []Point `json:"pathPoints"`
+	Reason          string  `json:"reason"`
+}
+

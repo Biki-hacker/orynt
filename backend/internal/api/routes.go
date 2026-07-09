@@ -32,6 +32,7 @@ func SetupRouter(handler *APIHandler, wsHub *WSHub, pubSub repository.PubSubRepo
 		// Public Telemetry & Info
 		api.GET("/stadium", handler.GetStadium)
 		api.GET("/stadium/zones", handler.GetCrowdZones)
+		api.GET("/stadium/exit-routing", handler.GetExitRoutes)
 		api.GET("/parking", handler.GetParking)
 		api.GET("/transport", handler.GetTransport)
 		api.GET("/food-stalls", handler.GetFoodStalls)

@@ -35,6 +35,7 @@ type StadiumService interface {
 	BroadcastAlert(ctx context.Context, title, content, alertType, severity string) (*models.Alert, error)
 	GetAlerts(ctx context.Context, activeOnly bool) ([]models.Alert, error)
 	ResolveAlert(ctx context.Context, id string) error
+	GetExitRoutes(ctx context.Context) ([]models.ExitRoute, error)
 }
 
 // OperationsService manages internal staff workloads and public utilities
