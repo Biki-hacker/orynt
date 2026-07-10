@@ -19,6 +19,7 @@
   - [Real-Time WebSocket](#real-time-websocket)
 - [Dual-Mode Persistence](#dual-mode-persistence)
 - [RAG AI Pipeline](#rag-ai-pipeline)
+- [Smart Exit Routing Engine](#smart-exit-routing-engine)
 - [Authentication & Authorization](#authentication--authorization)
 - [Rate Limiting](#rate-limiting)
 - [Middleware Stack](#middleware-stack)
@@ -236,6 +237,7 @@ No authentication required.
 | `POST` | `/api/auth/login` | `Login` | `{ username, password }` | `{ accessToken, refreshToken, user }` |
 | `GET` | `/api/stadium` | `GetStadium` | — | Stadium object with facilities map |
 | `GET` | `/api/stadium/zones` | `GetCrowdZones` | — | `CrowdZone[]` |
+| `GET` | `/api/stadium/exit-routing` | `GetExitRoutes` | — | `ExitRoute[]` (smart exit pathways mapping) |
 | `GET` | `/api/parking` | `GetParking` | — | `Parking[]` |
 | `GET` | `/api/transport` | `GetTransport` | — | `Transport[]` |
 | `GET` | `/api/food-stalls` | `GetFoodStalls` | — | `FoodStall[]` |
@@ -246,7 +248,8 @@ No authentication required.
 | `POST` | `/api/lost-found` | `ReportLostItem` | `{ itemName, description, category, contactName, contactPhone }` | `LostFoundItem` |
 | `GET` | `/api/lost-found` | `ListLostItems` | — | `LostFoundItem[]` |
 | `POST` | `/api/medical` | `CreateMedicalRequest` | `{ requester, location, description }` | `MedicalRequest` |
-| `POST` | `/api/ai/chat` | `AIChat` | `{ message, role? }` | `{ response, sources[] }` |
+| `POST` | `/api/ai/chat` | `AIChat` | `{ message, role, history: ChatHistoryItem[] }` | SSE stream (chunked text tokens) + final chunk containing sources list |
+| `GET` | `/api/sustainability` | `GetSustainabilityMetrics` | — | `{ current: { attendance, energyUsageKw, waterConsumptionL, wasteGeneratedKg }, historical: [{ time, attendance, energyUsageKw, waterConsumptionL, wasteGeneratedKg }], recommendations: string }` |
 | `GET` | `/api/ws` | `WebSocketHandler` | — | Upgrades to WebSocket |
 | `GET` | `/health` | inline | — | `{ status: "UP" }` |
 
@@ -417,20 +420,50 @@ Current Stadium Live Context:
 User Role: public
 ```
 
-### Step 3: Gemini API Call
+### Step 3: Multi-Turn Conversation History
+The API endpoint `/api/ai/chat` accepts an optional `history` array. The backend maps past exchanges to the correct conversational role (`user` vs `model`) and constructs a continuous dialogue context before calling the model, enabling multi-turn conversation threads.
 
-- **Model:** `gemini-2.5-flash`
-- **Endpoint:** `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`
-- **Timeout:** 10 seconds
-- **Auth:** API key as query parameter
+### Step 4: Gemini Streaming API & SSE
+- **Model**: `gemini-2.5-flash`
+- **Endpoint**: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent`
+- **Timeout**: 30 seconds
+- **Delivery**: Backend processes chunked JSON tokens from the Gemini Stream and forwards them immediately to the client as Server-Sent Events (SSE) using Gin's `c.Stream()` and `http.Flusher`.
 
-### Step 4: Fallback Engine
+### Step 5: Gemini Function Calling (Incident Dispatch Copilot)
+If the user's role belongs to the staff console (e.g., admin, volunteer, security, medical, cleaning, ops), the RAG pipeline registers three executable tools with the Gemini API:
+1. `create_task(title, description, department, priority)`: Creates a new operational task in the Firestore repository and broadcasts the update to the Kanban board via the `tasks` WebSocket channel.
+2. `broadcast_alert(title, content, severity)`: Creates and displays a stadium-wide alert banner, broadcasting the update via the `alerts` WebSocket channel.
+3. `assign_medical_incident(incidentId, volunteerId)`: Assigns a pending medical emergency request to a responder, broadcasting the update via the `medical` WebSocket channel.
 
-If `GEMINI_API_KEY` is empty or the API returns a non-200 status:
+Gemini decides when to call these tools based on the staff conversation, and the backend handles tool execution and publishes the WS notifications automatically.
 
-The local engine matches the user's message against keyword patterns (`food`, `parking`, `match`, `emergency`, `accessibility`, `lost`, `transport`, `task`) and returns pre-formatted responses that reference the seeded data. Staff-role users receive additional task status summaries.
+### Step 6: Sustainability Eco-Advisor
+- **Endpoint**: `/api/sustainability`
+- **Logic**: packages current crowd size alongside dynamically computed energy usage (kW), water flow (L), and waste metrics (kg). Passes them to Gemini with a system prompt instructing the model to return 3 highly specific eco-efficiency suggestions.
+
+### Step 7: Fallback Engine
+
+If `GEMINI_API_KEY` is empty or the API returns an error:
+1. **Chat/Copilot Fallback**: A local word-by-word streaming generator parses user text for keywords. If tool keywords are found (e.g. "create task"), it invokes `parseAndExecuteLocalTool` to execute local mocks, otherwise it returns telemetry-grounded rule responses.
+2. **Eco-Advisor Fallback**: Dynamically selects preset recommendations mapped to low, medium, or high attendance brackets.
 
 The fallback transparently annotates its response with `*(Note: Gemini API returned an error, using local fallback assistant)*` when the API specifically fails (vs. being unconfigured).
+
+---
+
+## Smart Exit Routing Engine
+
+To prevent dangerous crowd crushing when a match concludes or during evacuation, the backend features a smart routing engine that dynamically matches stadium sections to exit gates based on live density telemetry.
+
+- **Endpoint**: `/api/stadium/exit-routing`
+- **Algorithm**:
+  1. Retrieves all `crowd_zones` representing stadium stands (e.g. North Stand, South Stand) and their current occupancy levels.
+  2. Retrieves the configured exit gates (e.g. Gate A, Gate B) and their status.
+  3. Maps each section to its closest exit gates.
+  4. If a primary exit gate is heavily congested (e.g. >80% capacity or high density in surrounding zones), the routing engine calculates alternative paths to nearby under-utilized exits (e.g., routing North Stand visitors to Gate B instead of Gate A).
+  5. Returns a structured mapping of sections, exit directions, coordinates, and recommendations.
+
+The frontend reads this mapping to overlay dynamic, animated glowing paths on the interactive SVG Stadium Map, warning users away from bottlenecks and visually directing them along optimal routes.
 
 ---
 

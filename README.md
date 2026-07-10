@@ -13,7 +13,8 @@
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Core Features](#core-features)
-  - [GenAI-Powered RAG Assistant](#genai-powered-rag-assistant)
+  - [Generative AI Integrations (Google Gemini)](#generative-ai-integrations-google-gemini)
+  - [Dynamic Wayfinding & Smart Exit Routing](#dynamic-wayfinding--smart-exit-routing)
   - [Real-Time Telemetry Pipeline](#real-time-telemetry-pipeline)
   - [Role-Based Access & Security](#role-based-access--security)
   - [Public-Facing Fan Experience](#public-facing-fan-experience)
@@ -267,16 +268,23 @@ Orynt/
 
 ## Core Features
 
-### GenAI-Powered RAG Assistant
+### Generative AI Integrations (Google Gemini)
 
-The AI assistant is not a wrapper around a generic chatbot. It implements a custom RAG pipeline:
+Orynt leverages the Google Gemini 2.5 Flash API to deliver three core intelligent services:
 
-1. **Context Retrieval** — On every chat request, `gatherRAGContext()` performs parallel reads against Firestore collections: matches, crowd zones, parking, transport, food stalls, and active alerts. For authenticated staff users, it additionally fetches the task queue.
-2. **Context Injection** — The retrieved data is serialized into structured markdown sections (e.g., `### Live Tournament and Matches`, `### Parking Occupancy`) and injected into Gemini's `systemInstruction` field alongside a strict grounding directive.
-3. **Model Call** — The user's message is sent to `gemini-2.5-flash` via REST with a 10-second timeout.
-4. **Fallback Engine** — If the API key is missing or the call fails, a rule-based local engine matches keywords against the same grounded context and returns formatted responses with emoji-enhanced sections.
-5. **Source Attribution** — Every response includes a `sources[]` array (e.g., "Live Match Telemetry", "Smart Parking Sensors", "Emergency Broadcast Center") displayed as provenance badges in the chat UI.
-6. **Role-Aware Context** — Public users see navigation/facilities/accessibility context. Staff users additionally see operational tasks and incident data. The system prompt includes the user's role so Gemini can tailor response tone and detail level.
+1. **Interactive AI Assistant (RAG Chatbot)** — A floating assistant grounded in live stadium context. Uses a custom Retrieval-Augmented Generation (RAG) pipeline to fetch matches, crowd zones, parking, transport, food stalls, and active alerts, compiling them into a structured system context.
+2. **Multi-Turn Conversation Memory & SSE Streaming** — The chat maintains a dialog history of the last 10 exchanges for contextual continuity (e.g. asking "Where is the nearest first aid?" followed by "How do I get there?"). Responses stream word-by-word via HTTP Server-Sent Events (SSE) using Gemini's `streamGenerateContent` API, minimizing latency.
+3. **Staff Incident Dispatch & Copilot** — For authenticated staff members, Gemini maps natural language instructions (e.g., *"Create a volunteer task to clean up a spill near Food Stall A"*) to structured API actions (e.g., `create_task`, `broadcast_alert`, `assign_medical_incident`) via **Gemini Function Calling**. Tool executions automatically update Firestore and broadcast notifications via WebSockets.
+4. **Sustainability Eco-Advisor** — Evaluates live stadium telemetry (attendance, energy in kW, water in L, waste in kg) on the Sustainability page and generates three dynamic, actionable eco-efficiency recommendations for venue managers.
+5. **Source Attribution & Fallbacks** — Every chat response displays provenance badges indicating data sources. If the Gemini API is unconfigured or unreachable, the system transparently falls back to an offline rule-based streaming engine.
+
+### Dynamic Wayfinding & Smart Exit Routing
+
+To prevent dangerous crowd crushing at match conclusion or during evacuations, Orynt features a dynamic exit routing engine and visual wayfinding overlay:
+
+- **Routing Engine** — A backend algorithm (`/api/stadium/exit-routing`) that evaluates real-time crowd densities in stadium stands and pairs them dynamically with the closest, under-utilized exit gates.
+- **Animated Map Overlays** — The interactive SVG Stadium Map reads the routing mapping to draw glowing, animated path indicators directing fans from congested sections toward the safest exits (e.g., routing traffic to Gate B if Gate A is bottlenecked).
+- **Real-Time Synchronization** — Map overlays adapt automatically as zone densities fluctuate, keeping pathways updated in real time via WebSocket broadcasts.
 
 ### Real-Time Telemetry Pipeline
 
@@ -377,6 +385,7 @@ Density levels are automatically computed from occupancy ratios: ≥80% = `high`
 | `POST` | `/api/auth/login` | Authenticate and receive JWT + refresh token |
 | `GET` | `/api/stadium` | Venue details, facilities, accessible routes |
 | `GET` | `/api/stadium/zones` | Live crowd density per zone |
+| `GET` | `/api/stadium/exit-routing` | Live crowd exit pathways mapping (smart exit-routing) |
 | `GET` | `/api/parking` | Parking lot occupancy |
 | `GET` | `/api/transport` | Transit schedules and delays |
 | `GET` | `/api/food-stalls` | Food stall directory with wait times |
@@ -387,7 +396,8 @@ Density levels are automatically computed from occupancy ratios: ≥80% = `high`
 | `POST` | `/api/lost-found` | Report a lost item |
 | `GET` | `/api/lost-found` | Browse lost & found items |
 | `POST` | `/api/medical` | Request medical assistance |
-| `POST` | `/api/ai/chat` | RAG AI chatbot query |
+| `POST` | `/api/ai/chat` | RAG AI streaming chat query (supports SSE, history context, and function calling tools) |
+| `GET` | `/api/sustainability` | Sustainability metrics dashboard telemetry (live & historical) + Gemini Eco-Advisor recommendations |
 | `GET` | `/api/ws` | WebSocket upgrade for real-time events |
 | `GET` | `/health` | Health check (`{ status: "UP" }`) |
 
@@ -568,8 +578,7 @@ firebase deploy --only firestore
 
 ### Near-Term Enhancements
 
-- **Multi-Turn Conversation Memory** — Store chat sessions in Firestore and include the last N exchanges in the Gemini context window, enabling follow-up questions like *"What about the south lot?"* after asking about parking.
-- **Streaming AI Responses** — Replace the synchronous Gemini REST call with Server-Sent Events (SSE) or chunked responses, displaying tokens as they arrive — dramatically improving perceived latency on complex queries.
+- **Session History Persistence** — Store chat sessions in Firestore rather than local React component memory, allowing users to resume conversations across device refreshes.
 - **Push Notification Layer** — Integrate Firebase Cloud Messaging (FCM) for browser and mobile push notifications on critical alerts, matching the priority system already in place (critical/high/info).
 - **Predictive Crowd Analytics** — Feed historical crowd zone data into a time-series model (or Gemini's function calling) to predict congestion 15–30 minutes ahead, enabling proactive gate management and exit flow optimization.
 
@@ -579,7 +588,6 @@ firebase deploy --only firestore
 - **Multilingual Interface** — The Gemini system prompt can be extended with a language directive (e.g., "Respond in Hindi if the user writes in Hindi"). Combined with `react-i18next` on the frontend, this enables full multilingual support without separate translation files — the AI handles dynamic translation contextually.
 - **IoT Ingestion Pipeline** — Replace admin override endpoints with dedicated ingestion APIs that accept bulk sensor readings (crowd counters, parking barriers, turnstile taps) over MQTT or gRPC, with rate-controlled writes to Firestore.
 - **SSO Integration** — Replace internal JWT auth with OAuth 2.0 / OpenID Connect via Firebase Auth or Auth0, enabling staff to log in with organizational credentials (Google Workspace, Microsoft Entra ID).
-- **Sustainability Dashboard** — The metrics endpoint already computes waste generation, energy usage, and water consumption. Extending this with historical trend charts and Gemini-powered sustainability recommendations ("Based on today's attendance of 27,400, you could reduce waste by 12% by activating recycling station C") would directly address the sustainability evaluation criterion.
 
 ### Long-Term Architectural Evolution
 
@@ -587,7 +595,6 @@ firebase deploy --only firestore
 - **Horizontal Scaling** — The WebSocket hub currently runs in-process. Migrating to a Redis-backed broadcast channel (already partially implemented via `StartPubSubListener`) enables running multiple backend instances behind a load balancer with shared WS state.
 - **Offline-First Mobile App** — The REST + WS API surface is already mobile-ready. A React Native or Flutter wrapper with local SQLite caching would enable stadium navigation and AI assistance even in underground concourses with poor connectivity.
 - **Digital Twin** — The interactive SVG stadium map is a foundation for a full 3D digital twin (via Three.js or Mapbox GL), enabling real-time crowd flow visualization, heat mapping, and wayfinding with turn-by-turn navigation.
-- **AI-Powered Incident Response** — Extend the AI service with function calling to let Gemini not just answer questions but take actions: auto-dispatch medical teams, trigger alert broadcasts, or reallocate volunteers based on crowd predictions — turning the assistant from a read-only advisor into an operational copilot.
 
 ---
 

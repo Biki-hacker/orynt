@@ -27,8 +27,7 @@
   - [Dashboard Layout](#dashboard-layout)
   - [Public Pages](#public-pages)
   - [Staff Console](#staff-console)
-  - [Admin Command Center](#admin-command-center)
-- [AI Chatbot](#ai-chatbot)
+  - [Admin Command Center](#admin-command-cent- [Generative AI Integrations (Google Gemini)](#generative-ai-integrations-google-gemini)
 - [Interactive Stadium Map](#interactive-stadium-map)
 - [Real-Time Notifications](#real-time-notifications)
 - [TypeScript Types](#typescript-types)
@@ -100,7 +99,7 @@ frontend/
 ├── package.json                 # 12 dependencies, 10 devDependencies
 ├── package-lock.json            # Deterministic installs
 ├── vite.config.ts               # Dev server port 3000, /api proxy to :8080, WS proxy
-├── tailwind.config.js           # Brand palette, Inter font, custom neutral scale
+├── tailwind.config.js           # Brand palette, Inter font stack, custom neutral scale
 ├── postcss.config.js            # autoprefixer + tailwindcss plugins
 ├── tsconfig.json                # Strict TS: noUnusedLocals, noImplicitReturns, etc.
 ├── .env.example                 # Environment variable template
@@ -251,6 +250,7 @@ Defined in `App.tsx` with nested layout routes:
 ├── /map ................. VenueMapPage (interactive SVG map)
 ├── /transport ........... TransportParking
 ├── /food-faq ............ FoodFAQ
+├── /sustainability ...... Sustainability (energy, water, waste + Gemini Eco-Advisor)
 └── /login ............... Login
 
 /staff ................... DashboardLayout (JWT-gated)
@@ -468,6 +468,7 @@ Inter is loaded via Google Fonts (`<link>` in `index.html`) with weights 300–7
 | **Venue Map** | `VenueMapPage.tsx` | Wraps `StadiumMap` component. Displays accessible routes info. |
 | **Transport & Parking** | `TransportParking.tsx` | Transport routes table (mode icon, delay, status badge, capacity). Parking occupancy bars with percentage and type badges. |
 | **Food & FAQ** | `FoodFAQ.tsx` | Food stall cards with name, location, wait time, menu items, open/closed status. FAQ accordion section. |
+| **Sustainability** | `Sustainability.tsx` | Displays live power usage (kW), water consumption (L), and waste generated (kg) metrics with interactive Recharts line graphs and an eco-advisor panel powered by Gemini RAG recommendations. |
 
 ### Staff Console
 
@@ -492,28 +493,26 @@ Inter is loaded via Google Fonts (`<link>` in `index.html`) with weights 300–7
 
 ---
 
-## AI Chatbot
+## Generative AI Integrations (Google Gemini)
 
-`components/Chat/AIChatbot.tsx` implements a floating assistant:
+Orynt leverages the Google Gemini 2.5 Flash API to deliver three core intelligent services:
 
-**Visual design:**
-- **Collapsed:** Blue `MessageSquare` FAB in bottom-right corner (56×56px), hover scale effect
-- **Expanded:** 384×500px white card with dark zinc-900 header, message area, quick suggestions, and input bar
+### 1. Interactive AI Assistant (RAG Chatbot)
+The chatbot (`components/Chat/AIChatbot.tsx`) is a persistent floating assistant grounded in live stadium context.
+- **Real-Time Text Streaming**: Fetches streaming text responses word-by-word via Server-Sent Events (SSE) from the backend `/api/ai/chat` endpoint.
+- **Multi-Turn Conversation Memory**: Retains state of past exchanges (last 10 messages) in React state and passes it to the backend contents history array, allowing fans to query contextually (e.g. "Where is the nearest first aid?" followed by "How do I get there?").
+- **Source Attribution**: Visualizes sources badges (e.g., "Smart Parking Sensors", "Transport API Feed") at the bottom of the message bubble for complete grounding transparency.
 
-**Features:**
-- **Conversation history** — Messages stored in local React state with user/AI sender distinction and timestamps
-- **Markdown rendering** — Inline bold (`**text**`) and italic (`*text*`) parsing with styled `<strong>` and `<em>` elements
-- **Source attribution** — AI responses display provenance badges (e.g., "Live Match Telemetry", "Smart Parking Sensors") from the backend's RAG pipeline
-- **Typing indicator** — Three bouncing dots with staggered animation delay (0ms, 150ms, 300ms)
-- **Suggested prompts** — Four pre-built queries ("What is the live score?", "Find available parking", etc.) as clickable pills
-- **Error handling** — API failures display inline error messages in the chat thread
-- **Auto-scroll** — `scrollIntoView({ behavior: 'smooth' })` on new messages
+### 2. Staff Incident Dispatch & Copilot
+For authenticated staff members (volunteers, security, medical, etc.), the AI chatbot behaves as a functional Copilot:
+- **Gemini Function Calling (Structured Tool Use)**: Parses natural language intents to execute specific tools directly.
+- **Action Execution**: Allows commands like *"Create a cleaning task to clean up a spill near Food Stall A"* or *"Broadcast a transit delay alert for Metro Line 1"* to automatically call `create_task` or `broadcast_alert` on the backend, update Firestore, and broadcast state changes via WebSockets.
 
-**API integration:**
-```typescript
-const data = await api.post<AIChatResponse>('/ai/chat', { message: text })
-// Returns: { response: string, sources: string[] }
-```
+### 3. Sustainability Eco-Advisor
+Integrated into the **Sustainability Dashboard** (`pages/Public/Sustainability.tsx`):
+- **Live Analysis**: Pulls current stadium telemetry (attendance, energy usage in kW, water flow in Liters, waste in kilograms).
+- **Dynamic Optimization Tips**: Sends this telemetry context to Gemini, generating three highly targeted, actionable recommendations (e.g. recommending dimming lights in empty zones, adjusting water pressure, or optimizing cleanup shifts).
+- **Graceful Fallback**: If the Gemini API is offline, it drops back to structured heuristics based on attendance thresholds.
 
 ---
 
@@ -525,6 +524,7 @@ const data = await api.post<AIChatResponse>('/ai/chat', { message: text })
 - **Crowd density overlays** — Zones are color-coded based on `densityLevel`: green (low), amber (medium), red (high)
 - **Facility markers** — Food stalls, restrooms, medical stations, emergency exits displayed as labeled icons
 - **Accessible routes** — Highlighted paths for wheelchair access (elevators, ramps, priority exits)
+- **Dynamic Wayfinding & Smart Exit Routing** — When a user selects a congested zone, or when a tournament match is completed, the map queries the backend exit routing service and overlays glowing animated paths directing fans toward the safest, under-utilized gate (e.g., directing traffic to Gate B rather than Gate A to avoid crushes).
 - **Real-time updates** — Subscribes to `crowd_density` WebSocket events to update zone colors without page refresh
 - **Tooltip/detail panels** — Clicking a zone shows occupancy numbers, nearby facilities, and navigation hints
 
@@ -571,6 +571,8 @@ Additionally, `PublicLayout` maintains a separate **Emergency Alert Banner** at 
 | `AuditLog` | id, userId, username, action, resource, details, timestamp | Admin audit table |
 | `LiveTelemetryMetrics` | attendance, peakCrowd, parking, waste, energy, water, tasks, medical | Admin analytics dashboard |
 | `AIChatResponse` | response, sources[] | Chatbot message rendering |
+| `SustainabilityMetrics` | current, historical, recommendations | Sustainability dashboard |
+| `SustainabilityHistoricalPoint` | time, attendance, energyUsageKw, waterConsumptionL, wasteGeneratedKg | Sustainability timeline |
 
 All union types (e.g., `status: 'scheduled' | 'live' | 'completed'`) match the backend's string constants exactly, enabling compile-time safety on conditional rendering logic.
 
