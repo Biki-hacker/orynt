@@ -12,7 +12,7 @@ interface ChatMessage {
 
 const renderFormattedText = (text: string) => {
   if (!text) return null
-  const parts = text.split(/(\*\*[^\*]+\*\*|\*[^\*]+\*)/g)
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g)
   return parts.map((part, index) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return (

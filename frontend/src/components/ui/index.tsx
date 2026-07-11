@@ -168,6 +168,9 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-label={label ? label : "Dropdown select"}
           className={`w-full h-9 flex items-center justify-between bg-white border border-zinc-200 rounded-lg px-3 text-sm text-neutral-800 text-left focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-500 transition-all cursor-pointer font-medium ${className}`}
         >
           <span className="truncate">{selectedOption ? selectedOption.label : 'Select...'}</span>
@@ -175,13 +178,15 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         </button>
 
         {isOpen && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1 animate-in fade-in duration-100">
+          <div role="listbox" className="absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1 animate-in fade-in duration-100">
             {options.map((opt) => {
               const isSelected = opt.value === value
               return (
                 <button
                   key={opt.value}
                   type="button"
+                  role="option"
+                  aria-selected={isSelected}
                   onClick={() => {
                     onChange(opt.value)
                     setIsOpen(false)

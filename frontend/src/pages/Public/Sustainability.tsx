@@ -20,7 +20,7 @@ const formatAIOutput = (text: string) => {
         }
 
         // Handle bold parsing
-        const parts = cleanLine.split(/(\*\*[^\*]+\*\*)/g)
+        const parts = cleanLine.split(/(\*\*[^*]+\*\*)/g)
         const renderedText = parts.map((part, pIdx) => {
           if (part.startsWith('**') && part.endsWith('**')) {
             return (
