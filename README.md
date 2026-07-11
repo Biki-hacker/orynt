@@ -551,7 +551,7 @@ firebase deploy --only firestore
 
 ## Assumptions Made
 
-1. **Single-stadium scope** — The current implementation assumes a single venue (`stadium_01`). Multi-venue support is architecturally possible (the stadium ID is already a parameter) but not exercised in the seed data.
+1. **Single-stadium scope & Static Match Data** — The current implementation assumes a single specific venue (`stadium_01`) and uses static match data. In reality, event organizers (not local stadium admins or staff) would have the credentials to create matches and assign them to specific stadiums. The web application built here is scoped to a single specific stadium. In scaling or future real-life usage, the Orynt platform will support multiple stadium listings.
 
 2. **IoT data simulation** — Real stadium IoT sensor data (crowd counters, parking barrier feeds) is simulated via admin telemetry override endpoints. In production, these would be replaced by ingestion pipelines from hardware vendors.
 
@@ -584,7 +584,7 @@ firebase deploy --only firestore
 
 ### Medium-Term Platform Growth
 
-- **Multi-Stadium / Multi-Venue** — The `stadiumId` foreign key already exists in crowd zones. Extending the UI to a venue selector and deploying separate data partitions per stadium would enable tournament-wide coverage across multiple venues.
+- **Multi-Stadium / Multi-Venue** — The `stadiumId` foreign key already exists in crowd zones. In reality, event organizers (rather than local stadium admins or staff) would have access to create matches and assign them to specific stadiums. Extending the UI to a venue selector and deploying separate data partitions per stadium would enable tournament-wide coverage across multiple venues in the Orynt platform.
 - **Multilingual Interface** — The Gemini system prompt can be extended with a language directive (e.g., "Respond in Hindi if the user writes in Hindi"). Combined with `react-i18next` on the frontend, this enables full multilingual support without separate translation files — the AI handles dynamic translation contextually.
 - **IoT Ingestion Pipeline** — Replace admin override endpoints with dedicated ingestion APIs that accept bulk sensor readings (crowd counters, parking barriers, turnstile taps) over MQTT or gRPC, with rate-controlled writes to Firestore.
 - **SSO Integration** — Replace internal JWT auth with OAuth 2.0 / OpenID Connect via Firebase Auth or Auth0, enabling staff to log in with organizational credentials (Google Workspace, Microsoft Entra ID).
