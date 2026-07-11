@@ -196,10 +196,10 @@ func (r *FirestoreRepository) seedData() {
 			HomeScore:    2,
 			AwayScore:    1,
 			Status:       "live",
-			ScheduledAt:  time.Now().Add(-1 * time.Hour),
+			ScheduledAt:  time.Now().Add(-82 * time.Minute - 23 * time.Second),
 			TimeElapsed:  "67:23",
 			Events: []models.MatchComment{
-				{Time: "12'", Type: "info", Detail: "Match kicks off under clear conditions at Orynt Arena."},
+				{Time: "0'", Type: "info", Detail: "Match kicks off under clear conditions at Orynt Arena."},
 				{Time: "24'", Type: "goal", Detail: "GOAL! Spartans FC score. Target hit by striker #9 (J. Cole)."},
 				{Time: "45'", Type: "card", Detail: "Yellow Card: Titans United #4 (R. Vance) for a sliding tackle."},
 				{Time: "55'", Type: "goal", Detail: "GOAL! Titans United equalizes. Header by #11 (S. Ray) off a corner kick."},
