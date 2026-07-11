@@ -547,6 +547,32 @@ func (s *aiService) gatherRAGContext(ctx context.Context, role string) (string, 
 	var builder strings.Builder
 	var sources []string
 
+	// Fetch stadium details for accessibility and facilities
+	stadium, err := s.dbRepo.GetStadium(ctx, "stadium_01")
+	if err == nil && stadium != nil {
+		builder.WriteString("### Stadium Infrastructure & Accessibility:\n")
+		fmt.Fprintf(&builder, "- Name: %s. Capacity: %d seats.\n", stadium.Name, stadium.Capacity)
+		if len(stadium.AccessibleRoutes) > 0 {
+			builder.WriteString("- Accessible Routes: ")
+			for idx, r := range stadium.AccessibleRoutes {
+				if idx > 0 {
+					builder.WriteString(", ")
+				}
+				builder.WriteString(r)
+			}
+			builder.WriteString("\n")
+		}
+		if len(stadium.Facilities) > 0 {
+			builder.WriteString("- Facilities:\n")
+			for category, facList := range stadium.Facilities {
+				for _, fac := range facList {
+					fmt.Fprintf(&builder, "  * [%s] %s at %s\n", category, fac.Name, fac.Location)
+				}
+			}
+		}
+		sources = append(sources, "Stadium Venue Map Configuration")
+	}
+
 	// Fetch matches
 	matches, err := s.dbRepo.ListMatches(ctx, "")
 	if err == nil && len(matches) > 0 {

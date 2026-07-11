@@ -212,7 +212,11 @@ export const AIChatbot: React.FC = () => {
                 <span className="text-[10px] text-zinc-400 font-medium">Telemetry-Grounded RAG</span>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} aria-label="Close AI Chatbot" className="text-zinc-400 hover:text-white transition-colors">
+            <button
+              onClick={() => setIsOpen(false)}
+              aria-label="Close AI Chatbot"
+              className="text-zinc-400 hover:text-white hover:bg-zinc-800 w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>

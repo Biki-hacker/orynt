@@ -40,7 +40,7 @@ const ToastContainer: React.FC = () => {
           <button
             onClick={() => removeNotification(n.id)}
             aria-label="Close notification"
-            className="text-zinc-400 hover:text-zinc-600 transition-colors p-1"
+            className="w-9 h-9 flex items-center justify-center text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-full transition-colors flex-shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -112,7 +112,7 @@ export const PublicLayout: React.FC = () => {
           <button
             onClick={() => setActiveAlerts((prev) => prev.slice(1))}
             aria-label="Dismiss emergency alert"
-            className="text-red-100 hover:text-white transition-colors"
+            className="text-red-100 hover:text-white hover:bg-red-700/50 w-9 h-9 flex items-center justify-center rounded-full transition-colors flex-shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -163,7 +163,7 @@ export const PublicLayout: React.FC = () => {
                     navigate('/')
                   }}
                   aria-label="Log out"
-                  className="text-zinc-400 hover:text-zinc-600 p-1"
+                  className="text-zinc-400 hover:text-zinc-600 w-9 h-9 flex items-center justify-center hover:bg-zinc-100 rounded-full transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -180,7 +180,7 @@ export const PublicLayout: React.FC = () => {
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label="Toggle navigation menu"
-              className="md:hidden text-zinc-500 hover:text-neutral-800 p-1"
+              className="md:hidden text-zinc-500 hover:text-neutral-800 w-10 h-10 flex items-center justify-center hover:bg-zinc-100 rounded-lg transition-colors"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
