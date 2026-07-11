@@ -505,7 +505,8 @@ Inter is loaded via Google Fonts (`<link>` in `index.html`) with weights 300–7
 Orynt leverages the Google Gemini 2.5 Flash API to deliver three core intelligent services:
 
 ### 1. Interactive AI Assistant (RAG Chatbot)
-The chatbot (`components/Chat/AIChatbot.tsx`) is a persistent floating assistant grounded in live stadium context.
+- **RAG Grounding**: The chatbot (`components/Chat/AIChatbot.tsx`) is a persistent floating assistant grounded in live stadium context. It integrates both real-time telemetry feeds (matches, crowd density, parking, transit, alerts) and static venue layout parameters (elevators, exits, medical rooms, restrooms, and accessible paths) to answer navigation queries with complete correctness.
+- **Multilingual Support**: Automatically detects the user's language and responds in the same language (e.g. Spanish, French, German, Japanese, Portuguese, Hindi, Arabic) naturally.
 - **Real-Time Text Streaming**: Fetches streaming text responses word-by-word via Server-Sent Events (SSE) from the backend `/api/ai/chat` endpoint.
 - **Multi-Turn Conversation Memory**: Retains state of past exchanges (last 10 messages) in React state and passes it to the backend contents history array, allowing fans to query contextually (e.g. "Where is the nearest first aid?" followed by "How do I get there?").
 - **Source Attribution**: Visualizes sources badges (e.g., "Smart Parking Sensors", "Transport API Feed") at the bottom of the message bubble for complete grounding transparency.
