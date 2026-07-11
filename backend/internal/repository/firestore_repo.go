@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"log"
+	"orynt/internal/models"
 	"sync"
 	"time"
-	"orynt/internal/models"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -196,7 +196,7 @@ func (r *FirestoreRepository) seedData() {
 			HomeScore:    2,
 			AwayScore:    1,
 			Status:       "live",
-			ScheduledAt:  time.Now().Add(-82 * time.Minute - 23 * time.Second),
+			ScheduledAt:  time.Now().Add(-82*time.Minute - 23*time.Second),
 			TimeElapsed:  "67:23",
 			Events: []models.MatchComment{
 				{Time: "0'", Type: "info", Detail: "Match kicks off under clear conditions at Orynt Arena."},

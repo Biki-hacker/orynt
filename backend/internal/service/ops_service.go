@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 	"orynt/internal/models"
 	"orynt/internal/repository"
+	"time"
 )
 
 type opsService struct {

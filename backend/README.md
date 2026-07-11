@@ -188,6 +188,14 @@ go mod download
 go run main.go
 ```
 
+### Running Tests
+
+Run the full backend Go test suite locally using the standard testing tool:
+```bash
+go test -v ./...
+```
+
+
 **Expected startup logs (in-memory mode):**
 
 ```

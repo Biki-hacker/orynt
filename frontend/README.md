@@ -186,6 +186,13 @@ npm run dev
 # → http://localhost:3000
 ```
 
+### Running Tests
+
+We use Vitest for fast, concurrent unit and component testing. Run the frontend test suite:
+```bash
+npm run test
+```
+
 **The Vite dev server automatically proxies:**
 
 | Frontend Request | Backend Target |

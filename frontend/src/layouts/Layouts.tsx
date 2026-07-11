@@ -39,6 +39,7 @@ const ToastContainer: React.FC = () => {
           </div>
           <button
             onClick={() => removeNotification(n.id)}
+            aria-label="Close notification"
             className="text-zinc-400 hover:text-zinc-600 transition-colors p-1"
           >
             <X className="w-4 h-4" />
@@ -110,6 +111,7 @@ export const PublicLayout: React.FC = () => {
           </div>
           <button
             onClick={() => setActiveAlerts((prev) => prev.slice(1))}
+            aria-label="Dismiss emergency alert"
             className="text-red-100 hover:text-white transition-colors"
           >
             <X className="w-4 h-4" />
@@ -160,6 +162,7 @@ export const PublicLayout: React.FC = () => {
                     clearAuth()
                     navigate('/')
                   }}
+                  aria-label="Log out"
                   className="text-zinc-400 hover:text-zinc-600 p-1"
                 >
                   <LogOut className="w-4 h-4" />
@@ -176,6 +179,7 @@ export const PublicLayout: React.FC = () => {
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle navigation menu"
               className="md:hidden text-zinc-500 hover:text-neutral-800 p-1"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}

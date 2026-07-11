@@ -191,6 +191,7 @@ export const AIChatbot: React.FC = () => {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
+          aria-label="Open AI Chatbot"
           className="w-14 h-14 rounded-full bg-brand-600 hover:bg-brand-700 text-white flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-brand-200"
         >
           <MessageSquare className="w-6 h-6" />
@@ -211,7 +212,7 @@ export const AIChatbot: React.FC = () => {
                 <span className="text-[10px] text-zinc-400 font-medium">Telemetry-Grounded RAG</span>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="text-zinc-400 hover:text-white transition-colors">
+            <button onClick={() => setIsOpen(false)} aria-label="Close AI Chatbot" className="text-zinc-400 hover:text-white transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -294,6 +295,7 @@ export const AIChatbot: React.FC = () => {
             <button
               type="submit"
               disabled={!inputText.trim()}
+              aria-label="Send message"
               className="w-9 h-9 rounded-lg bg-brand-600 hover:bg-brand-700 text-white flex items-center justify-center shadow-sm disabled:bg-zinc-100 disabled:text-zinc-300 transition-colors"
             >
               <Send className="w-4 h-4" />

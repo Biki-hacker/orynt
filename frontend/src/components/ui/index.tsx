@@ -57,7 +57,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
       <div className="bg-white border border-zinc-200 rounded-lg shadow-lg w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100">
           <h3 className="font-semibold text-neutral-800">{title}</h3>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 transition-colors">
+          <button onClick={onClose} aria-label="Close dialog" className="text-zinc-400 hover:text-zinc-600 transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>

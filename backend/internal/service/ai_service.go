@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"orynt/internal/models"
+	"orynt/internal/repository"
 	"os"
 	"strings"
 	"time"
-	"orynt/internal/models"
-	"orynt/internal/repository"
 )
 
 type aiService struct {
@@ -107,6 +107,10 @@ func (s *aiService) Chat(ctx context.Context, req *models.AIChatRequest) (*model
 You must answer questions from the perspective of an AI helper grounded in current stadium telemetry.
 Never hallucinate or guess. Use ONLY the facts provided below to ground your answer.
 If you don't know the answer or if it's not in the context, politely say so.
+
+Multilingual & Accessibility Instructions:
+1. Multilingual Support: Always detect the language of the user's message and respond in the same language. For example, if they write in Spanish, reply in Spanish; if in Hindi, reply in Hindi. Keep translations natural and contextually appropriate for a global FIFA World Cup 2026 audience.
+2. Accessibility: Structure navigation steps and tables with clear markdown bullet points so text-to-speech screen readers can easily parse them for visually impaired users.
 
 Current Stadium Live Context:
 ---
@@ -293,7 +297,7 @@ func (s *aiService) ChatStream(ctx context.Context, req *models.AIChatRequest, o
 			})
 		}
 		response := s.generateLocalResponse(req.Message, contextInfo, req.Role)
-		
+
 		// Stream the response with word-by-word delays
 		words := strings.Fields(response)
 		for i, word := range words {
@@ -309,7 +313,7 @@ func (s *aiService) ChatStream(ctx context.Context, req *models.AIChatRequest, o
 			}
 			time.Sleep(30 * time.Millisecond) // slight delay to simulate streaming
 		}
-		
+
 		// Send final sources chunk
 		return onChunk(&models.AIChatResponse{
 			Response: "",
@@ -322,6 +326,10 @@ func (s *aiService) ChatStream(ctx context.Context, req *models.AIChatRequest, o
 You must answer questions from the perspective of an AI helper grounded in current stadium telemetry.
 Never hallucinate or guess. Use ONLY the facts provided below to ground your answer.
 If you don't know the answer or if it's not in the context, politely say so.
+
+Multilingual & Accessibility Instructions:
+1. Multilingual Support: Always detect the language of the user's message and respond in the same language. For example, if they write in Spanish, reply in Spanish; if in Hindi, reply in Hindi. Keep translations natural and contextually appropriate for a global FIFA World Cup 2026 audience.
+2. Accessibility: Structure navigation steps and tables with clear markdown bullet points so text-to-speech screen readers can easily parse them for visually impaired users.
 
 Current Stadium Live Context:
 ---
@@ -462,7 +470,7 @@ User Role: %s`, contextInfo, req.Role)
 			})
 		}
 		response := s.generateLocalResponse(req.Message, contextInfo, req.Role)
-		
+
 		// Stream the response with word-by-word delays
 		words := strings.Fields(response)
 		for i, word := range words {
@@ -893,7 +901,7 @@ func (s *aiService) parseAndExecuteLocalTool(ctx context.Context, message string
 			CreatedAt:   time.Now(),
 		}
 		_ = s.dbRepo.CreateTask(ctx, task)
-		
+
 		msg := models.WSMessage{
 			Type:    "task_update",
 			Payload: task,
@@ -976,4 +984,3 @@ func (s *aiService) parseAndExecuteLocalTool(ctx context.Context, message string
 
 	return "", false
 }
-

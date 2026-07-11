@@ -296,7 +296,7 @@ func (h *APIHandler) BroadcastAlert(c *gin.Context) {
 	var req struct {
 		Title    string `json:"title" binding:"required"`
 		Content  string `json:"content" binding:"required"`
-		Type     string `json:"type" binding:"required"` // emergency, weather, crowd, transport
+		Type     string `json:"type" binding:"required"`     // emergency, weather, crowd, transport
 		Severity string `json:"severity" binding:"required"` // critical, high, info
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {

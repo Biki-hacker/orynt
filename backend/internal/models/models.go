@@ -7,7 +7,7 @@ type User struct {
 	ID         string    `json:"id" firestore:"id"`
 	Username   string    `json:"username" firestore:"username"`
 	Password   string    `json:"-" firestore:"password"` // bcrypt hashed, omitted from JSON
-	Role       string    `json:"role" firestore:"role"` // admin, volunteer, security, medical, cleaning, parking, transport, ops
+	Role       string    `json:"role" firestore:"role"`  // admin, volunteer, security, medical, cleaning, parking, transport, ops
 	Department string    `json:"department" firestore:"department"`
 	CreatedAt  time.Time `json:"createdAt" firestore:"createdAt"`
 }
@@ -27,11 +27,11 @@ type TokenResponse struct {
 
 // Stadium represents a venue details
 type Stadium struct {
-	ID               string                 `json:"id" firestore:"id"`
-	Name             string                 `json:"name" firestore:"name"`
-	Capacity         int                    `json:"capacity" firestore:"capacity"`
-	AccessibleRoutes []string               `json:"accessibleRoutes" firestore:"accessibleRoutes"`
-	Facilities       map[string][]Facility  `json:"facilities" firestore:"facilities"` // "food", "restrooms", "medical", "exits"
+	ID               string                `json:"id" firestore:"id"`
+	Name             string                `json:"name" firestore:"name"`
+	Capacity         int                   `json:"capacity" firestore:"capacity"`
+	AccessibleRoutes []string              `json:"accessibleRoutes" firestore:"accessibleRoutes"`
+	Facilities       map[string][]Facility `json:"facilities" firestore:"facilities"` // "food", "restrooms", "medical", "exits"
 }
 
 // Facility represents icons/locations on map
@@ -67,9 +67,9 @@ type Match struct {
 
 // MatchComment represents live text commentary event
 type MatchComment struct {
-	Time    string `json:"time" firestore:"time"`
-	Type    string `json:"type" firestore:"type"` // goal, card, substitution, info
-	Detail  string `json:"detail" firestore:"detail"`
+	Time   string `json:"time" firestore:"time"`
+	Type   string `json:"type" firestore:"type"` // goal, card, substitution, info
+	Detail string `json:"detail" firestore:"detail"`
 }
 
 // CrowdZone represents real-time density in sections
@@ -89,7 +89,7 @@ type Parking struct {
 	ZoneName      string `json:"zoneName" firestore:"zoneName"` // e.g. "Lot A", "VIP Deck"
 	TotalSpots    int    `json:"totalSpots" firestore:"totalSpots"`
 	OccupiedSpots int    `json:"occupiedSpots" firestore:"occupiedSpots"`
-	Type          string `json:"type" firestore:"type"`         // public, vip, staff, accessible
+	Type          string `json:"type" firestore:"type"` // public, vip, staff, accessible
 	Location      string `json:"location" firestore:"location"`
 }
 
@@ -100,7 +100,7 @@ type Transport struct {
 	Mode         string    `json:"mode" firestore:"mode"`           // bus, train, shuttle
 	NextArrival  time.Time `json:"nextArrival" firestore:"nextArrival"`
 	DelayMinutes int       `json:"delayMinutes" firestore:"delayMinutes"`
-	Status       string    `json:"status" firestore:"status"` // on_time, delayed, suspended
+	Status       string    `json:"status" firestore:"status"`     // on_time, delayed, suspended
 	Capacity     string    `json:"capacity" firestore:"capacity"` // normal, high, full
 }
 
@@ -143,7 +143,7 @@ type MedicalRequest struct {
 	Requester   string    `json:"requester" firestore:"requester"`
 	Location    string    `json:"location" firestore:"location"`
 	Description string    `json:"description" firestore:"description"`
-	Status      string    `json:"status" firestore:"status"` // pending, assigned, resolved
+	Status      string    `json:"status" firestore:"status"`         // pending, assigned, resolved
 	AssignedTo  string    `json:"assignedTo" firestore:"assignedTo"` // Staff user ID or name
 	RequestedAt time.Time `json:"requestedAt" firestore:"requestedAt"`
 }
@@ -163,8 +163,8 @@ type Task struct {
 	Title       string    `json:"title" firestore:"title"`
 	Description string    `json:"description" firestore:"description"`
 	AssignedTo  string    `json:"assignedTo" firestore:"assignedTo"` // Username or user ID
-	Status      string    `json:"status" firestore:"status"` // todo, in_progress, done
-	Priority    string    `json:"priority" firestore:"priority"` // low, medium, high
+	Status      string    `json:"status" firestore:"status"`         // todo, in_progress, done
+	Priority    string    `json:"priority" firestore:"priority"`     // low, medium, high
 	Department  string    `json:"department" firestore:"department"` // volunteer, security, cleaning, etc.
 	CreatedAt   time.Time `json:"createdAt" firestore:"createdAt"`
 }
@@ -222,7 +222,7 @@ type AIChatResponse struct {
 
 // WSMessage represents real-time WebSockets payloads
 type WSMessage struct {
-	Type    string      `json:"type"`    // e.g. "match_score", "crowd_density", "alert", "task_update", "announcement"
+	Type    string      `json:"type"` // e.g. "match_score", "crowd_density", "alert", "task_update", "announcement"
 	Payload interface{} `json:"payload"`
 }
 
@@ -242,4 +242,3 @@ type ExitRoute struct {
 	PathPoints      []Point `json:"pathPoints"`
 	Reason          string  `json:"reason"`
 }
-

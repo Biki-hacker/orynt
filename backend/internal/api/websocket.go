@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"sync"
 	"orynt/internal/repository"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"

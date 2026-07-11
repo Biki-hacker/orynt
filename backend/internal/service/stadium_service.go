@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 	"orynt/internal/models"
 	"orynt/internal/repository"
+	"time"
 )
 
 type stadiumService struct {
@@ -293,4 +293,3 @@ func (s *stadiumService) GetExitRoutes(ctx context.Context) ([]models.ExitRoute,
 
 	return routes, nil
 }
-

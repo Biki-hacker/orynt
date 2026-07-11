@@ -74,4 +74,3 @@ func getEnvBool(key string, defaultVal bool) bool {
 	}
 	return val == "true" || val == "1" || val == "yes"
 }
-

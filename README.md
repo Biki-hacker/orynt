@@ -28,6 +28,7 @@
   - [Backend Setup](#backend-setup)
   - [Frontend Setup](#frontend-setup)
   - [Environment Variables](#environment-variables)
+  - [Running Tests](#running-tests)
 - [Deployment](#deployment)
 - [Assumptions Made](#assumptions-made)
 - [Known Limitations](#known-limitations)
@@ -524,6 +525,30 @@ npm run dev
 | `VITE_WS_HOST` | No | `localhost:8080` | WebSocket host |
 | `VITE_PORT` | No | `3000` | Dev server port |
 
+### Running Tests
+
+We have implemented a comprehensive test suite covering both the backend and frontend modules to verify business logic, middleware, and API endpoints.
+
+You can run the entire test suite using the single root script:
+```bash
+# Runs all backend and frontend tests in one command
+./run_tests.bat
+```
+
+Alternatively, you can run them individually:
+
+#### Backend (Golang) Tests
+```bash
+cd backend
+go test -v ./...
+```
+
+#### Frontend (React/Vite/TS) Tests
+```bash
+cd frontend
+npm run test
+```
+
 ---
 
 ## Deployment
@@ -570,7 +595,6 @@ firebase deploy --only firestore
 - **No persistent chat history** — Conversation context is maintained in React component state. Closing the chatbot resets history. Production would persist sessions in Firestore.
 - **No push notifications** — Alerts rely on WebSocket + in-app toasts. Production would integrate FCM (Firebase Cloud Messaging) for mobile push.
 - **Single-region deployment** — The Firestore instance runs in `nam5`. Global deployments would use multi-region databases.
-- **No automated tests** — The architecture supports testing (interfaces enable mocking), but unit and integration tests were not included in the hackathon scope.
 
 ---
 
